@@ -13,9 +13,9 @@ The chord-detection library is platform agnostic, but leans on the MIDI specific
 The command-line tool is currently MacOS only as it relies getting MIDI data via [the coremidi crate](https://crates.io/crates/coremidi) which provides Rust bindings for the [CoreMIDI macOS framework](https://developer.apple.com/reference/coremidi) that provides macOS APIs for communicating with MIDI devices, such as hardware synthesizers or keyboards.
 
 ## Near realtime timing requirements
-I considered using [the midir crate](https://github.com/Boddlnagg/midir) which provides cross-platform MIDI processing. However, this abstraction does not support scheduling sending MIDI events. This is needed as we have near realtime timing requirements. 
+I considered using [the midir crate](https://github.com/Boddlnagg/midir) which provides cross-platform MIDI processing. However, this abstraction does not support scheduling sending MIDI events. This is needed as we have near realtime timing requirements.
 
-Ideally, we want sub millisecond precision timing, because more than about 10 to 20 milliseconds offset from the expected timing is easily detected by ear, so we simply cannot rely on thread::sleep as it has no such precise guarantees. 
+Ideally, we want sub millisecond precision timing, because more than about 10 to 20 milliseconds offset from the expected timing is easily detected by ear, so we simply cannot rely on thread::sleep as it has no such precise guarantees.
 
 However, CoreMIDI supports scheduling sending, which offloads the realtime aspect to macOS and we can just schedule the coming half second of notes or so ahead of time and then thread::sleep for a while.
 
@@ -24,7 +24,9 @@ I'm not well versed in musical theory, and there are certainly variations in how
 
 The played notes are normalized into a single octave,  and de-duplicated - so it does not matter if you play C-E-G-Bb-D, or C-D-E-G-Bb, or even C-D-E-G-Bb-C, all will be recognized as a C7(9). As a simpler example of deduplication, C-E-G-C will be recognized as a C Major chord as the second C is ignored.
 
-Examples and explanations are in the C key, but the chord recognition
+Examples and explanations are in the C key, but the chord recognition handles chords in any key, including all possible inversions (changing the fingering of the chord which means playing some notes in an octave above or below, often for practial porposes during a chord progression). So for example C-F-A will be unambigously recognized as a F major chord, even though the third note in the chord was voiced an octave lower then the uninverted F major of F-A-C.
+
+These are the recognized chords, and their names, and (uninverted) fingerings:
 
 * Major (C) C-E-G
 * Minor (Cm) C-Eb-G
@@ -78,3 +80,31 @@ C-Eb-Gb-Bb
 
 See also [pianochord.org](https://www.pianochord.org) for more details on the chords and the theory behind it.
 
+### Resolving alternate chord interpretations
+Some chord inversions, however are identical to other chords (both non-inverted, or one of the inversions) in which case one must be selected over the other.
+
+Some examples of this happening are:
+
+* Am6 with the F# as the lowest key is identical to an uninverted F#m7b5 chord.
+* A7b5 with a low D# is identical to D#7b5.
+* Am7 with a low C is equal to a C6.
+* Am7(11) with a low C is also a C6(9).
+* Adim7 with a low C is the same as Cdim7 and also the same as a D#dim7 played with a low C which is the same as a F#dim7 with a low C.
+* An ASus2 with a low E is equal to a ESus4.
+* AAug with a low C# equals C#Aug equals FAug with a low C#.
+
+The rules for chord resolution are basically the following:
+
+* less inverted chords are prefered over more inverted ones.
+* sevens are preferred over sixes
+* sus4 is preferred over sus2
+
+so in the example collissions above the following happens;
+
+* any uninverted chord is recognized as-is.
+* an inverted F#m7b5 is preferred over an inverted Am6 (but Am6 is recognized if played uninverted).
+* an inverted D#7b5 is preferred over an inverted A7b5 (but A7b5 is recognized if played uninverted).
+* an inverted Am7 is preferred over an inverted C6 (but C6 is recognized if played uninverted).
+* an inverted Am7(11) is preferred over an inverted C6(9) (but C6(9) is recognized if played uninverted).
+* an inverted ESus4 is preferred over an inverted ASus2 (but ASus2 is recognized if played uninverted).
+* Uninverted dim7 and aug chords are preferred over their inverted versions.
