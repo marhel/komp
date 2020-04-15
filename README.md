@@ -4,7 +4,7 @@ The `komp` is a utility for musicians. It consists of the command line tool `kom
 
 ## Features
 * Chord detection (recognizes over 30 different chord types in all 12 keys, or over 400 chords in total)
-* [Planned] Auto-accompaniment (adding rhytm, bass and chord playback matching the recognized chord)
+* [Planned] Auto-accompaniment (adding rhythm, bass and chord playback matching the recognized chord)
 * [Planned] Auto-accompaniment created from Yamaha Style Files.
 
 ## Platform dependence
@@ -24,7 +24,7 @@ I'm not well versed in musical theory, and there are certainly variations in how
 
 The played notes are normalized into a single octave,  and de-duplicated - so it does not matter if you play C-E-G-Bb-D, or C-D-E-G-Bb, or even C-D-E-G-Bb-C, all will be recognized as a C7(9). As a simpler example of deduplication, C-E-G-C will be recognized as a C Major chord as the second C is ignored.
 
-Examples and explanations are in the C key, but the chord recognition handles chords in any key, including all possible inversions (changing the fingering of the chord which means playing some notes in an octave above or below, often for practial porposes during a chord progression). So for example C-F-A will be unambigously recognized as a F major chord, even though the third note in the chord was voiced an octave lower then the uninverted F major of F-A-C.
+Examples and explanations are in the C key, but the chord recognition handles chords in any key, including all possible inversions (changing the fingering of the chord by playing some notes in an octave above or below, often for practical purposes during a chord progression). So for example C-F-A will be unambiguously recognized as a F major chord, even though the third note in the chord was voiced an octave lower then the uninverted F major of F-A-C.
 
 These are the recognized chords, and their names, and (uninverted) fingerings:
 
@@ -95,11 +95,11 @@ Some examples of this happening are:
 
 The rules for chord resolution are basically the following:
 
-* less inverted chords are prefered over more inverted ones.
+* less inverted chords are preferred over more inverted ones.
 * sevens are preferred over sixes
 * sus4 is preferred over sus2
 
-so in the example collissions above the following happens;
+so in the example collisions above the following happens;
 
 * any uninverted chord is recognized as-is.
 * an inverted F#m7b5 is preferred over an inverted Am6 (but Am6 is recognized if played uninverted).
