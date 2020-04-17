@@ -4,6 +4,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+mod external {
+    #[link(name = "CoreAudio", kind = "framework")]
+    extern "C" {
+        pub fn AudioConvertHostTimeToNanos(inHostTime: u64) -> u64;
+        pub fn AudioGetCurrentHostTime() -> u64;
+    }
+}
+use crate::external::{AudioConvertHostTimeToNanos, AudioGetCurrentHostTime};
+mod play;
+
 fn main() {
     println!("komp");
 
@@ -11,12 +21,26 @@ fn main() {
     let read_current_chord = Arc::clone(&current_chord);
 
     let source_index = get_source_index();
+    let destination_index = get_destination_index();
+
     let source = coremidi::Source::from_index(source_index)
         .expect(&format!("cannot get coremidi source[{}]", source_index));
     let source_name = source
         .display_name()
         .expect("cannot get coremidi source name");
-    println!("Using source {} <{}>", source_index, source_name);
+    println!("Using source[{}] <{}>", source_index, source_name);
+
+    let destination = coremidi::Destination::from_index(destination_index).expect(&format!(
+        "cannot get coremidi destination[{}]",
+        destination_index
+    ));
+    let destination_name = destination
+        .display_name()
+        .expect("cannot get coremidi destination name");
+    println!(
+        "Using destination[{}] <{}>",
+        destination_index, destination_name
+    );
 
     let client = coremidi::Client::new("komp-client").expect("cannot create coremidi client");
 
@@ -32,13 +56,33 @@ fn main() {
         detect_chord(&mut was_playing, &mut playing, &current_chord);
     };
 
+    let input_port = client
+        .input_port("komp-port", receive_midi)
+        .expect("cannot create input port");
+    input_port
+        .connect_source(&source)
+        .expect("cannot connect input port to source");
+    let output_port = client.output_port("komp-port").unwrap();
+
     let _handle = thread::spawn(move || {
         let d = Duration::from_millis(3000);
         let mut last_key = None;
+        let mut timestamp;
         loop {
             let current_key = *read_current_chord.lock().unwrap();
             if last_key != current_key {
                 println!("T: {:?}", current_key);
+                if last_key.is_none() {
+                    unsafe {
+                        timestamp = Some(AudioConvertHostTimeToNanos(AudioGetCurrentHostTime()));
+                    }
+                    coremidi::flush().expect("cannot flush coremidi queued events");
+                    let packet_buf =
+                        play::schedule_music(timestamp.unwrap(), *current_key.unwrap().key());
+                    output_port
+                        .send(&destination, &packet_buf)
+                        .expect("cannot send MIDI packet");
+                }
                 last_key = current_key;
             } else {
                 print!(".")
@@ -46,13 +90,6 @@ fn main() {
             thread::sleep(d);
         }
     });
-
-    let input_port = client
-        .input_port("komp-port", receive_midi)
-        .expect("cannot create input port");
-    input_port
-        .connect_source(&source)
-        .expect("cannot connect input port to source");
 
     let mut input_line = String::new();
     println!("Press [Enter] to finish ...");
@@ -182,6 +219,50 @@ fn get_source_index() -> usize {
 fn print_sources() {
     for (i, source) in coremidi::Sources.into_iter().enumerate() {
         match source.display_name() {
+            Some(display_name) => println!("[{}] {}", i, display_name),
+            None => (),
+        }
+    }
+}
+
+fn get_destination_index() -> usize {
+    let mut args_iter = env::args();
+    let tool_name = args_iter
+        .next()
+        .and_then(|path| {
+            path.split(std::path::MAIN_SEPARATOR)
+                .last()
+                .map(|v| v.to_string())
+        })
+        .unwrap_or("send".to_string());
+
+    match args_iter.next() {
+        Some(arg) => match arg.parse::<usize>() {
+            Ok(index) => {
+                if index >= coremidi::Destinations::count() {
+                    println!("Destination index out of range: {}", index);
+                    std::process::exit(-1);
+                }
+                index
+            }
+            Err(_) => {
+                println!("Wrong destination index: {}", arg);
+                std::process::exit(-1);
+            }
+        },
+        None => {
+            println!("Usage: {} <destination-index>", tool_name);
+            println!("");
+            println!("Available Destinations:");
+            print_destinations();
+            std::process::exit(-1);
+        }
+    }
+}
+
+fn print_destinations() {
+    for (i, destination) in coremidi::Destinations.into_iter().enumerate() {
+        match destination.display_name() {
             Some(display_name) => println!("[{}] {}", i, display_name),
             None => (),
         }
