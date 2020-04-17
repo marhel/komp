@@ -1,5 +1,4 @@
 use komp_core::*;
-use std::env;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -13,6 +12,9 @@ mod external {
 }
 use crate::external::{AudioConvertHostTimeToNanos, AudioGetCurrentHostTime};
 mod play;
+mod setup;
+use crate::setup::*;
+use std::env;
 
 fn main() {
     println!("komp");
@@ -20,8 +22,11 @@ fn main() {
     let current_chord: Arc<Mutex<Option<Chord>>> = Arc::new(Mutex::new(None));
     let read_current_chord = Arc::clone(&current_chord);
 
-    let source_index = get_source_index();
-    let destination_index = get_destination_index();
+    let mut args_iter = env::args();
+    let tool_name = tool_name(&mut args_iter);
+
+    let source_index = get_source_index(&mut args_iter, &tool_name);
+    let destination_index = get_destination_index(&mut args_iter, &tool_name);
 
     let source = coremidi::Source::from_index(source_index)
         .expect(&format!("cannot get coremidi source[{}]", source_index));
@@ -179,94 +184,6 @@ fn process_midi<'a>(data: &[u8], playing: &'a mut Vec<(u8, u8)>) -> &'a Vec<(u8,
         _ => println!("Unknown command {} in packet {:?}", command, data),
     };
     playing
-}
-
-fn get_source_index() -> usize {
-    let mut args_iter = env::args();
-    let tool_name = args_iter
-        .next()
-        .and_then(|path| {
-            path.split(std::path::MAIN_SEPARATOR)
-                .last()
-                .map(|v| v.to_string())
-        })
-        .unwrap_or("komp".to_string());
-
-    match args_iter.next() {
-        Some(arg) => match arg.parse::<usize>() {
-            Ok(index) => {
-                if index >= coremidi::Sources::count() {
-                    println!("Source index out of range: {}", index);
-                    std::process::exit(-1);
-                }
-                index
-            }
-            Err(_) => {
-                println!("Wrong source index: {}", arg);
-                std::process::exit(-1);
-            }
-        },
-        None => {
-            println!("Usage: {} <source-index>", tool_name);
-            println!("");
-            println!("Available Sources:");
-            print_sources();
-            std::process::exit(-1);
-        }
-    }
-}
-
-fn print_sources() {
-    for (i, source) in coremidi::Sources.into_iter().enumerate() {
-        match source.display_name() {
-            Some(display_name) => println!("[{}] {}", i, display_name),
-            None => (),
-        }
-    }
-}
-
-fn get_destination_index() -> usize {
-    let mut args_iter = env::args();
-    let tool_name = args_iter
-        .next()
-        .and_then(|path| {
-            path.split(std::path::MAIN_SEPARATOR)
-                .last()
-                .map(|v| v.to_string())
-        })
-        .unwrap_or("send".to_string());
-
-    match args_iter.next() {
-        Some(arg) => match arg.parse::<usize>() {
-            Ok(index) => {
-                if index >= coremidi::Destinations::count() {
-                    println!("Destination index out of range: {}", index);
-                    std::process::exit(-1);
-                }
-                index
-            }
-            Err(_) => {
-                println!("Wrong destination index: {}", arg);
-                std::process::exit(-1);
-            }
-        },
-        None => {
-            println!("Usage: {} <destination-index>", tool_name);
-            println!("");
-            println!("Available Destinations:");
-            print_destinations();
-            std::process::exit(-1);
-        }
-    }
-}
-
-fn print_destinations() {
-    for (i, destination) in coremidi::Destinations.into_iter().enumerate() {
-        match destination.display_name() {
-            Some(display_name) => println!("[{}] {}", i, display_name),
-            None => (),
-        }
-    }
 }
 
 #[cfg(test)]
