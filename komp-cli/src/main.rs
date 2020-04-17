@@ -1,7 +1,14 @@
+use komp_core::*;
 use std::env;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     println!("komp");
+
+    let current_chord: Arc<Mutex<Option<Chord>>> = Arc::new(Mutex::new(None));
+    let read_current_chord = Arc::clone(&current_chord);
 
     let source_index = get_source_index();
     let source = coremidi::Source::from_index(source_index)
@@ -22,8 +29,23 @@ fn main() {
             process_midi(data, &mut playing);
         }
 
-        detect_chord(&mut was_playing, &mut playing);
+        detect_chord(&mut was_playing, &mut playing, &current_chord);
     };
+
+    let _handle = thread::spawn(move || {
+        let d = Duration::from_millis(3000);
+        let mut last_key = None;
+        loop {
+            let current_key = *read_current_chord.lock().unwrap();
+            if last_key != current_key {
+                println!("T: {:?}", current_key);
+                last_key = current_key;
+            } else {
+                print!(".")
+            }
+            thread::sleep(d);
+        }
+    });
 
     let input_port = client
         .input_port("komp-port", receive_midi)
@@ -45,7 +67,11 @@ fn main() {
     println!("disconnected from source <{}>", source_name);
 }
 
-fn detect_chord(was_playing: &mut Vec<(u8, u8)>, playing: &mut Vec<(u8, u8)>) {
+fn detect_chord(
+    was_playing: &mut Vec<(u8, u8)>,
+    playing: &mut Vec<(u8, u8)>,
+    current_chord_mutex: &Arc<Mutex<Option<Chord>>>,
+) {
     was_playing.sort();
     was_playing.dedup();
     playing.sort();
@@ -68,6 +94,8 @@ fn detect_chord(was_playing: &mut Vec<(u8, u8)>, playing: &mut Vec<(u8, u8)>) {
                     print!("{}{} ", name[(note % 12) as usize], note / 12)
                 }
                 println!("]");
+                let mut current_chord = current_chord_mutex.lock().unwrap();
+                *current_chord = Some(*chord);
             }
             None => {
                 print!("no chord recognized in [ ");
@@ -75,8 +103,10 @@ fn detect_chord(was_playing: &mut Vec<(u8, u8)>, playing: &mut Vec<(u8, u8)>) {
                     print!("{}{} ", name[(note % 12) as usize], note / 12)
                 }
                 println!("]");
-            },
-        }
+                let mut current_chord = current_chord_mutex.lock().unwrap();
+                *current_chord = None;
+            }
+        };
     }
 }
 

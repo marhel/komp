@@ -1,6 +1,6 @@
 use crate::key::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Chord {
     None(Key),
     Major(Key),
