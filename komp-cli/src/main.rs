@@ -11,8 +11,10 @@ mod external {
     }
 }
 use crate::external::{AudioConvertHostTimeToNanos, AudioGetCurrentHostTime};
+mod pattern;
 mod play;
 mod setup;
+
 use crate::setup::*;
 use std::env;
 

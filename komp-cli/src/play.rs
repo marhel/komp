@@ -1,11 +1,11 @@
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq)]
-struct TimedEvent {
-    timing: u32,
-    event: Event,
+pub struct TimedEvent {
+    pub timing: u32,
+    pub event: Event,
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, PartialEq, Eq)]
-enum Event {
+pub enum Event {
     Rest,
     NoteOn { channel: u8, note: u8, velocity: u8 },
     NoteOff { channel: u8, note: u8, velocity: u8 },
