@@ -73,6 +73,8 @@ fn main() {
 
     let _handle = thread::spawn(move || {
         let d = Duration::from_millis(3000);
+        let ticks_per_quarter = 96;
+        let ms_per_quarter = 500_000;
         let mut last_key = None;
         let mut timestamp;
         loop {
@@ -84,8 +86,14 @@ fn main() {
                         timestamp = Some(AudioConvertHostTimeToNanos(AudioGetCurrentHostTime()));
                     }
                     coremidi::flush().expect("cannot flush coremidi queued events");
-                    let packet_buf =
-                        play::schedule_music(timestamp.unwrap(), *current_key.unwrap().key());
+                    let timed_events = pattern::create_bar(ticks_per_quarter, current_key.unwrap());
+                    let packet_buf = play::schedule(
+                        timestamp.unwrap(),
+                        timed_events,
+                        C_KEY,
+                        ms_per_quarter,
+                        ticks_per_quarter,
+                    );
                     output_port
                         .send(&destination, &packet_buf)
                         .expect("cannot send MIDI packet");

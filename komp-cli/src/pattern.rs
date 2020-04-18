@@ -28,22 +28,22 @@ fn create_note(
 }
 
 #[derive(Clone, Copy)]
-struct TimeCode {
+pub struct TimeCode {
     bar: u32,
     beat: u8,
     tick: u32,
 }
 
 impl TimeCode {
-    fn new(bar: u32, beat: u8, tick: u32) -> TimeCode {
+    pub fn new(bar: u32, beat: u8, tick: u32) -> TimeCode {
         TimeCode { bar, beat, tick }
     }
-    fn ticks(&self, ticks_per_quarter: u32) -> u32 {
+    pub fn ticks(&self, ticks_per_quarter: u32) -> u32 {
         (self.bar * 4 + self.beat as u32) * ticks_per_quarter + self.tick
     }
 }
 
-fn create_note_part(
+pub fn create_note_part(
     ticks_per_quarter: u32,
     offset: TimeCode,
     part: u8,
@@ -56,7 +56,7 @@ fn create_note_part(
 use komp_core::Chord;
 use std::collections::BinaryHeap;
 
-fn create_chord_part(
+pub fn create_chord_part(
     ticks_per_quarter: u32,
     offset: TimeCode,
     part: u8,
@@ -71,6 +71,15 @@ fn create_chord_part(
     }
 
     heap.into_sorted_vec()
+}
+
+pub fn create_bar(ticks_per_quarter: u32, chord: Chord) -> Vec<TimedEvent> {
+    let mut timed_events = vec![];
+    for beat in 0..4 {
+        let offset = TimeCode::new(0, beat, 0);
+        timed_events.append(&mut create_chord_part(ticks_per_quarter, offset, 4, chord));
+    }
+    timed_events
 }
 
 #[cfg(test)]
