@@ -1,7 +1,7 @@
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq)]
-struct TimedEvent<'a> {
+struct TimedEvent {
     timing: u32,
-    event: &'a Event,
+    event: Event,
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, PartialEq, Eq)]
@@ -48,32 +48,32 @@ fn setup_events(channel: u8) -> Vec<Event> {
     events
 }
 
-fn distribute<'a>(events: &'a Vec<Event>, ppq: u32, len: u8) -> Vec<TimedEvent<'a>> {
+fn distribute(events: Vec<Event>, ppq: u32, len: u8) -> Vec<TimedEvent> {
     let mut timed_events = vec![];
     for quarter in 0..4 {
         timed_events.push(TimedEvent {
             timing: quarter * ppq,
-            event: &events[0],
+            event: events[0],
         });
         timed_events.push(TimedEvent {
             timing: quarter * ppq,
-            event: &events[1],
+            event: events[1],
         });
         timed_events.push(TimedEvent {
             timing: quarter * ppq,
-            event: &events[2],
+            event: events[2],
         });
         timed_events.push(TimedEvent {
             timing: quarter * ppq + len as u32,
-            event: &events[3],
+            event: events[3],
         });
         timed_events.push(TimedEvent {
             timing: quarter * ppq + len as u32,
-            event: &events[4],
+            event: events[4],
         });
         timed_events.push(TimedEvent {
             timing: quarter * ppq + len as u32,
-            event: &events[5],
+            event: events[5],
         });
     }
     timed_events
@@ -82,7 +82,7 @@ fn distribute<'a>(events: &'a Vec<Event>, ppq: u32, len: u8) -> Vec<TimedEvent<'
 pub fn schedule_music(timestamp: u64, key: Key) -> coremidi::PacketBuffer {
     let events = setup_events(1);
     let ppq = 96;
-    let tes = distribute(&events, ppq, 80);
+    let tes = distribute(events, ppq, 80);
 
     let mut packet_buf = coremidi::PacketBuffer::with_capacity(512);
     let ms_per_quarter = 500_000;
