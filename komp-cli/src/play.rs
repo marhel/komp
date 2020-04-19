@@ -11,6 +11,7 @@ pub enum Event {
 }
 
 use komp_core::*;
+const NS_PER_MS: u64 = 1_000_000;
 
 pub fn schedule(
     offset: u64,
@@ -22,6 +23,8 @@ pub fn schedule(
     let mut packet_buf = coremidi::PacketBuffer::with_capacity(512);
 
     for te in timed_events.iter() {
+        let event_time = pattern_start
+            + (NS_PER_MS * te.timing as u64 * ms_per_quarter as u64 / ticks_per_quarter as u64);
         let data = match te.event {
             Event::NoteOn {
                 channel,
@@ -42,12 +45,7 @@ pub fn schedule(
                 velocity & 0x7f,
             ],
         };
-        let ns_per_ms = 1_000_000;
-        packet_buf.push_data(
-            offset
-                + (ns_per_ms * te.timing as u64 * ms_per_quarter as u64 / ticks_per_quarter as u64),
-            &data,
-        );
+        packet_buf.push_data(event_time, &data);
     }
 
     packet_buf
@@ -86,21 +84,20 @@ mod tests {
 
         timings.sort();
         timings.dedup();
-        let ns_per_ms = 1_000_000;
 
         // even timings are note ons, odds are note offs
         assert_eq!(timings[0] - timestamp, 0 as u64);
         assert_eq!(
             timings[2] - timestamp,
-            1 * ms_per_quarter as u64 * ns_per_ms
+            1 * ms_per_quarter as u64 * NS_PER_MS
         );
         assert_eq!(
             timings[4] - timestamp,
-            2 * ms_per_quarter as u64 * ns_per_ms
+            2 * ms_per_quarter as u64 * NS_PER_MS
         );
         assert_eq!(
             timings[6] - timestamp,
-            3 * ms_per_quarter as u64 * ns_per_ms
+            3 * ms_per_quarter as u64 * NS_PER_MS
         );
     }
 
