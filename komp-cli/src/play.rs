@@ -25,7 +25,7 @@ pub fn schedule(
         offset,
         offset,
         one_bar,
-        timed_events,
+        &timed_events,
         one_bar,
         key,
         ms_per_quarter,
@@ -41,7 +41,7 @@ pub fn schedule_timeslice(
     pattern_start: u64,
     now: u64,
     timeslice: u64,
-    timed_events: Vec<TimedEvent>,
+    timed_events: &Vec<TimedEvent>,
     pattern_length: u64,
     key: Key,
     ms_per_quarter: u32,
@@ -56,7 +56,7 @@ pub fn schedule_timeslice(
                 event_time += pattern_length;
             }
         }
-        if event_time < now || event_time > now + timeslice {
+        if event_time < now || event_time >= now + timeslice {
             continue;
         }
         let data = match te.event {
@@ -91,6 +91,53 @@ mod tests {
     use crate::pattern::*;
     use crate::Playing;
     use komp_core::C_KEY;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_continual_scheduling() {
+        let pattern_start = 200_000_000_000_000;
+        let ticks_per_quarter = 96;
+        let ms_per_quarter = 500;
+        let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
+        let timed_events = create_bars(ticks_per_quarter, &progression);
+        let slice_length = 200 * NS_PER_MS;
+        // two bars at this tempo is exactly 4 seconds
+        let pattern_length = 4_000 * NS_PER_MS;
+
+        let mut slice_start = pattern_start;
+        let mut playing = vec![];
+        let mut played = HashSet::new();
+        while slice_start + slice_length <= pattern_start + 2 * pattern_length {
+            let packet_buf = schedule_timeslice(
+                pattern_start,
+                slice_start,
+                slice_length,
+                &timed_events,
+                pattern_length,
+                C_KEY,
+                ms_per_quarter,
+                ticks_per_quarter,
+            );
+
+            for packet in packet_buf.iter() {
+                for chunk in packet.data().chunks(3) {
+                    crate::process_midi(chunk, &mut playing);
+                }
+            }
+            played.insert(playing.clone());
+
+            slice_start += slice_length;
+        }
+
+        assert!(slice_start == pattern_start + 2 * pattern_length);
+        assert_eq!(playing, vec![]);
+
+        let f_major = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+        let c_major = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+        assert!(played.contains(&vec![]));
+        assert!(played.contains(&c_major));
+        assert!(played.contains(&f_major));
+    }
 
     fn extract_timings(packet_buf: &coremidi::PacketBuffer) -> Vec<u64> {
         let mut timings = vec![];
@@ -115,7 +162,7 @@ mod tests {
             pattern_start,
             now,
             two_hundred_and_fifty_ms,
-            timed_events,
+            &timed_events,
             pattern_length,
             C_KEY,
             ms_per_quarter,
