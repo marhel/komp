@@ -20,15 +20,21 @@ pub fn schedule(
     ms_per_quarter: u32,
     ticks_per_quarter: u32,
 ) -> coremidi::PacketBuffer {
+    let one_bar = ms_per_quarter as u64 * 4 * NS_PER_MS;
     schedule_timeslice(
         offset,
         offset,
-        ms_per_quarter as u64 * 4 * NS_PER_MS, // one bar
+        one_bar,
         timed_events,
+        one_bar,
         key,
         ms_per_quarter,
         ticks_per_quarter,
     )
+}
+
+fn ticks_to_time(offset: u64, ticks: u32, ms_per_quarter: u32, ticks_per_quarter: u32) -> u64 {
+    offset + (NS_PER_MS * ticks as u64 * ms_per_quarter as u64 / ticks_per_quarter as u64)
 }
 
 pub fn schedule_timeslice(
@@ -36,15 +42,20 @@ pub fn schedule_timeslice(
     now: u64,
     timeslice: u64,
     timed_events: Vec<TimedEvent>,
+    pattern_length: u64,
     key: Key,
     ms_per_quarter: u32,
     ticks_per_quarter: u32,
 ) -> coremidi::PacketBuffer {
     let mut packet_buf = coremidi::PacketBuffer::with_capacity(512);
-
     for te in timed_events.iter() {
-        let event_time = pattern_start
-            + (NS_PER_MS * te.timing as u64 * ms_per_quarter as u64 / ticks_per_quarter as u64);
+        let mut event_time =
+            ticks_to_time(pattern_start, te.timing, ms_per_quarter, ticks_per_quarter);
+        if now + timeslice >= pattern_start + pattern_length {
+            while event_time < now {
+                event_time += pattern_length;
+            }
+        }
         if event_time < now || event_time > now + timeslice {
             continue;
         }
@@ -80,30 +91,7 @@ mod tests {
     use crate::pattern::*;
     use komp_core::C_KEY;
 
-    #[test]
-    fn test_partial_scheduling() {
-        let ticks_per_quarter = 96;
-        let ms_per_quarter = 500;
-
-        let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
-        // two bars at this tempo is almost 4 seconds (the note off is not at the beat)
-        let timed_events = create_bars(ticks_per_quarter, &progression);
-        println!("{}", crate::now());
-        let pattern_start = 200_000_000_000_000;
-        // just before the last note-offs in the first bar (C key)
-        let now = pattern_start + 1_800 * NS_PER_MS;
-        // this slice extends over to the first note-ons of the next bar (F key)
-        let two_hundred_and_fifty_ms = 250 * NS_PER_MS;
-        let packet_buf = schedule_timeslice(
-            pattern_start,
-            now,
-            two_hundred_and_fifty_ms,
-            timed_events,
-            C_KEY,
-            ms_per_quarter,
-            ticks_per_quarter,
-        );
-
+    fn extract_timings(packet_buf: &coremidi::PacketBuffer) -> Vec<u64> {
         let mut timings = vec![];
         for packet in packet_buf.iter() {
             timings.push(packet.timestamp());
@@ -111,10 +99,56 @@ mod tests {
 
         timings.sort();
         timings.dedup();
+        timings
+    }
+
+    fn package_pattern_timeslice(pattern_start: u64, now: u64) -> coremidi::PacketBuffer {
+        let ticks_per_quarter = 96;
+        let ms_per_quarter = 500;
+        let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
+        let timed_events = create_bars(ticks_per_quarter, &progression);
+        let two_hundred_and_fifty_ms = 250 * NS_PER_MS;
+        // two bars at this tempo is exactly 4 seconds
+        let pattern_length = 4_000 * NS_PER_MS;
+        schedule_timeslice(
+            pattern_start,
+            now,
+            two_hundred_and_fifty_ms,
+            timed_events,
+            pattern_length,
+            C_KEY,
+            ms_per_quarter,
+            ticks_per_quarter,
+        )
+    }
+
+    #[test]
+    fn test_partial_scheduling_timing() {
+        let pattern_start = 200_000_000_000_000;
+        // just before the last note-offs in the first bar (C key)
+        // this slice extends over to the first note-ons of the second bar (F key)
+        let now = pattern_start + 1_800 * NS_PER_MS;
+        let packet_buf = package_pattern_timeslice(pattern_start, now);
+        let timings = extract_timings(&packet_buf);
 
         let note_offs = pattern_start + 1_875 * NS_PER_MS;
         assert_eq!(timings[0], note_offs);
         let note_ons = pattern_start + 2_000 * NS_PER_MS;
+        assert_eq!(timings[1], note_ons);
+    }
+
+    #[test]
+    fn test_partial_scheduling_timing_with_loop() {
+        let pattern_start = 200_000_000_000_000;
+        // just before the last note-offs in the second bar (F key)
+        // this slice extends over to the first note-ons of the repeated first bar (C key)
+        let now = pattern_start + 3_800 * NS_PER_MS;
+        let packet_buf = package_pattern_timeslice(pattern_start, now);
+        let timings = extract_timings(&packet_buf);
+
+        let note_offs = pattern_start + 3_875 * NS_PER_MS;
+        assert_eq!(timings[0], note_offs);
+        let note_ons = pattern_start + 4_000 * NS_PER_MS;
         assert_eq!(timings[1], note_ons);
     }
 
@@ -138,13 +172,7 @@ mod tests {
     fn assert_timings(packet_buf: coremidi::PacketBuffer, timestamp: u64, ms_per_quarter: u32) {
         assert_ne!(packet_buf.len(), 0);
 
-        let mut timings = vec![];
-        for packet in packet_buf.iter() {
-            timings.push(packet.timestamp());
-        }
-
-        timings.sort();
-        timings.dedup();
+        let timings = extract_timings(&packet_buf);
 
         // even timings are note ons, odds are note offs
         assert_eq!(timings[0] - timestamp, 0 as u64);
