@@ -123,6 +123,23 @@ mod tests {
     }
 
     #[test]
+    fn test_partial_scheduling_events() {
+        let pattern_start = 200_000_000_000_000;
+        // just before the last note-offs in the first bar (C key)
+        // this slice extends over to the first note-ons of the second bar (F key)
+        let now = pattern_start + 1_800 * NS_PER_MS;
+        let packet_buf = package_pattern_timeslice(pattern_start, now);
+
+        let mut playing = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+        for packet in packet_buf.iter() {
+            for chunk in packet.data().chunks(3) {
+                crate::process_midi(chunk, &mut playing);
+            }
+        }
+        assert_eq!(playing, vec![(0, 53), (0, 57), (0, 60)]);
+    }
+
+    #[test]
     fn test_partial_scheduling_timing() {
         let pattern_start = 200_000_000_000_000;
         // just before the last note-offs in the first bar (C key)
@@ -135,6 +152,23 @@ mod tests {
         assert_eq!(timings[0], note_offs);
         let note_ons = pattern_start + 2_000 * NS_PER_MS;
         assert_eq!(timings[1], note_ons);
+    }
+
+    #[test]
+    fn test_partial_scheduling_events_with_loop() {
+        let pattern_start = 200_000_000_000_000;
+        // just before the last note-offs in the second bar (F key)
+        // this slice extends over to the first note-ons of the repeated first bar (C key)
+        let now = pattern_start + 3_800 * NS_PER_MS;
+        let packet_buf = package_pattern_timeslice(pattern_start, now);
+
+        let mut playing = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+        for packet in packet_buf.iter() {
+            for chunk in packet.data().chunks(3) {
+                crate::process_midi(chunk, &mut playing);
+            }
+        }
+        assert_eq!(playing, vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)]);
     }
 
     #[test]
