@@ -56,7 +56,6 @@ pub fn schedule(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{AudioConvertHostTimeToNanos, AudioGetCurrentHostTime};
     use crate::pattern::*;
     use komp_core::C_KEY;
 
@@ -65,7 +64,7 @@ mod tests {
         ms_per_quarter: u32,
     ) -> (u64, coremidi::PacketBuffer) {
         let timed_events = create_bar(ticks_per_quarter, Chord::Major(C_KEY));
-        let timestamp = unsafe { AudioConvertHostTimeToNanos(AudioGetCurrentHostTime()) };
+        let timestamp = crate::now();
         let packet_buf = schedule(
             timestamp,
             timed_events,

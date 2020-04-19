@@ -82,9 +82,7 @@ fn main() {
             if last_key != current_key {
                 println!("T: {:?}", current_key);
                 if last_key.is_none() {
-                    unsafe {
-                        timestamp = Some(AudioConvertHostTimeToNanos(AudioGetCurrentHostTime()));
-                    }
+                    timestamp = Some(now());
                     coremidi::flush().expect("cannot flush coremidi queued events");
                     let timed_events = pattern::create_bar(ticks_per_quarter, current_key.unwrap());
                     let packet_buf = play::schedule(
@@ -117,6 +115,10 @@ fn main() {
         .disconnect_source(&source)
         .expect("cannot disconnect input port from source");
     println!("disconnected from source <{}>", source_name);
+}
+
+fn now() -> u64 {
+    unsafe { AudioConvertHostTimeToNanos(AudioGetCurrentHostTime()) }
 }
 
 fn detect_chord(
