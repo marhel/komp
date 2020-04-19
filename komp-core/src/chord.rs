@@ -141,7 +141,7 @@ impl Chord {
                     } else {
                         0
                     };
-                    offset + k + (octave + invert) * OCTAVE_STEPS
+                    offset + k + (1 + octave + invert) * OCTAVE_STEPS
                 })
                 .collect(),
         };
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn test_extract_chord_notes() {
         assert_eq!(
-            Chord::Major7(F_KEY).notes(4, 0),
+            Chord::Major7(F_KEY).notes(3, 0),
             vec![
                 5 + 0 + 4 * OCTAVE_STEPS,
                 5 + 4 + 4 * OCTAVE_STEPS,
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn test_extract_chord_notes_first_inversion() {
         assert_eq!(
-            Chord::Major7(F_KEY).notes(4, 1),
+            Chord::Major7(F_KEY).notes(3, 1),
             vec![
                 5 + 4 + 4 * OCTAVE_STEPS,
                 5 + 7 + 4 * OCTAVE_STEPS,
@@ -502,7 +502,7 @@ mod tests {
     #[test]
     fn test_extract_chord_notes_second_inversion() {
         assert_eq!(
-            Chord::Major7(F_KEY).notes(4, 2),
+            Chord::Major7(F_KEY).notes(3, 2),
             vec![
                 5 + 7 + 4 * OCTAVE_STEPS,
                 5 + 10 + 4 * OCTAVE_STEPS,
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn test_extract_chord_notes_third_inversion() {
         assert_eq!(
-            Chord::Major7(F_KEY).notes(4, 3),
+            Chord::Major7(F_KEY).notes(3, 3),
             vec![
                 5 + 10 + 4 * OCTAVE_STEPS,
                 5 + 0 + 5 * OCTAVE_STEPS,
