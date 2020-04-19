@@ -171,14 +171,17 @@ const CONTROLLER: u8 = 0xB0;
 const NOTE_ON: u8 = 0x90;
 const NOTE_OFF: u8 = 0x80;
 
-fn process_midi<'a>(data: &[u8], playing: &'a mut Vec<(u8, u8)>) -> &'a Vec<(u8, u8)> {
+type ChannelNote = (u8, u8);
+type Playing = Vec<ChannelNote>;
+
+fn process_midi<'a>(data: &[u8], playing: &'a mut Playing) {
     if data.len() == 1 && data[0] == ACTIVE_SENSE {
-        return playing;
+        return;
     }
 
     if data.len() != 3 {
         println!("packet not length 3; {:?})", data);
-        return playing;
+        return;
     }
 
     let channel = data[0] & CHANNEL_MASK;
@@ -195,7 +198,6 @@ fn process_midi<'a>(data: &[u8], playing: &'a mut Vec<(u8, u8)>) -> &'a Vec<(u8,
         }
         _ => println!("Unknown command {} in packet {:?}", command, data),
     };
-    playing
 }
 
 #[cfg(test)]

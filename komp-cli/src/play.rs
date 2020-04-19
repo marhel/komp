@@ -89,6 +89,7 @@ pub fn schedule_timeslice(
 mod tests {
     use super::*;
     use crate::pattern::*;
+    use crate::Playing;
     use komp_core::C_KEY;
 
     fn extract_timings(packet_buf: &coremidi::PacketBuffer) -> Vec<u64> {
@@ -122,6 +123,19 @@ mod tests {
         )
     }
 
+    fn verify_playing(
+        packet_buf: &coremidi::PacketBuffer,
+        mut playing: Playing,
+        afterwards: Playing,
+    ) {
+        for packet in packet_buf.iter() {
+            for chunk in packet.data().chunks(3) {
+                crate::process_midi(chunk, &mut playing);
+            }
+        }
+        assert_eq!(playing, afterwards);
+    }
+
     #[test]
     fn test_partial_scheduling_events() {
         let pattern_start = 200_000_000_000_000;
@@ -130,13 +144,12 @@ mod tests {
         let now = pattern_start + 1_800 * NS_PER_MS;
         let packet_buf = package_pattern_timeslice(pattern_start, now);
 
-        let mut playing = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
-        for packet in packet_buf.iter() {
-            for chunk in packet.data().chunks(3) {
-                crate::process_midi(chunk, &mut playing);
-            }
-        }
-        assert_eq!(playing, vec![(0, 53), (0, 57), (0, 60)]);
+        // pretend that a C Major chord is playing in octave 3
+        // afterwards the currently playing notes should be a F Major chord
+        let playing = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+        let afterwards = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+
+        verify_playing(&packet_buf, playing, afterwards);
     }
 
     #[test]
@@ -162,13 +175,12 @@ mod tests {
         let now = pattern_start + 3_800 * NS_PER_MS;
         let packet_buf = package_pattern_timeslice(pattern_start, now);
 
-        let mut playing = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
-        for packet in packet_buf.iter() {
-            for chunk in packet.data().chunks(3) {
-                crate::process_midi(chunk, &mut playing);
-            }
-        }
-        assert_eq!(playing, vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)]);
+        // pretend that a F Major chord is playing in octave 3
+        // afterwards the currently playing notes should be a C Major chord
+        let playing = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+        let afterwards = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+
+        verify_playing(&packet_buf, playing, afterwards);
     }
 
     #[test]
