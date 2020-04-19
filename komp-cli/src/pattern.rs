@@ -49,8 +49,8 @@ pub fn create_note_part(
     part: u8,
     note: u8,
 ) -> (TimedEvent, TimedEvent) {
-    let length = 0.8 * (ticks_per_quarter * 4 / part as u32) as f32;
-    create_note(offset.ticks(ticks_per_quarter), length as u32, 0, note, 120)
+    let length = 3 * ticks_per_quarter / part as u32;
+    create_note(offset.ticks(ticks_per_quarter), length, 0, note, 120)
 }
 
 use komp_core::Chord;
@@ -78,6 +78,17 @@ pub fn create_bar(ticks_per_quarter: u32, chord: Chord) -> Vec<TimedEvent> {
     for beat in 0..4 {
         let offset = TimeCode::new(0, beat, 0);
         timed_events.append(&mut create_chord_part(ticks_per_quarter, offset, 4, chord));
+    }
+    timed_events
+}
+
+pub fn create_bars(ticks_per_quarter: u32, chords: &[Chord]) -> Vec<TimedEvent> {
+    let mut timed_events = vec![];
+    for (bar, chord) in chords.iter().enumerate() {
+        for beat in 0..4 {
+            let offset = TimeCode::new(bar as u32, beat, 0);
+            timed_events.append(&mut create_chord_part(ticks_per_quarter, offset, 4, *chord));
+        }
     }
     timed_events
 }
