@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_chord_part_scheduled_timing_lores() {
         let ticks_per_quarter = 16;
-        let ms_per_quarter = 500_000;
+        let ms_per_quarter = 500;
         let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
 
         assert_timings(packet_buf, timestamp, ms_per_quarter)
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_chord_part_scheduled_timing_lores_slow() {
         let ticks_per_quarter = 16;
-        let ms_per_quarter = 500_000_000;
+        let ms_per_quarter = 500_000;
         let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
 
         assert_timings(packet_buf, timestamp, ms_per_quarter)
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn test_chord_part_scheduled_timing_hires() {
         let ticks_per_quarter = 96_000;
-        let ms_per_quarter = 500_000;
+        let ms_per_quarter = 500;
         let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
 
         assert_timings(packet_buf, timestamp, ms_per_quarter)
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_chord_part_scheduled_timing_hires_fast() {
         let ticks_per_quarter = 96_000;
-        let ms_per_quarter = 500;
+        let ms_per_quarter = 5;
         let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
 
         assert_timings(packet_buf, timestamp, ms_per_quarter)

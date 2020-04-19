@@ -74,7 +74,7 @@ fn main() {
     let _handle = thread::spawn(move || {
         let d = Duration::from_millis(3000);
         let ticks_per_quarter = 96;
-        let ms_per_quarter = 500_000;
+        let ms_per_quarter = 500;
         let mut last_key = None;
         let mut timestamp;
         loop {
