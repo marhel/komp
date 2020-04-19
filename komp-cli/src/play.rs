@@ -6,78 +6,11 @@ pub struct TimedEvent {
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, PartialEq, Eq)]
 pub enum Event {
-    Rest,
     NoteOn { channel: u8, note: u8, velocity: u8 },
     NoteOff { channel: u8, note: u8, velocity: u8 },
 }
 
 use komp_core::*;
-
-fn setup_events(channel: u8) -> Vec<Event> {
-    let mut events = Vec::new();
-    events.push(Event::NoteOn {
-        channel,
-        note: NOTE_C3,
-        velocity: 96,
-    });
-    events.push(Event::NoteOn {
-        channel,
-        note: NOTE_E3,
-        velocity: 96,
-    });
-    events.push(Event::NoteOn {
-        channel,
-        note: NOTE_G3,
-        velocity: 96,
-    });
-    events.push(Event::NoteOff {
-        channel,
-        note: NOTE_C3,
-        velocity: 64,
-    });
-    events.push(Event::NoteOff {
-        channel,
-        note: NOTE_E3,
-        velocity: 64,
-    });
-    events.push(Event::NoteOff {
-        channel,
-        note: NOTE_G3,
-        velocity: 64,
-    });
-    events
-}
-
-fn distribute(events: Vec<Event>, ppq: u32, len: u8) -> Vec<TimedEvent> {
-    let mut timed_events = vec![];
-    for quarter in 0..4 {
-        timed_events.push(TimedEvent {
-            timing: quarter * ppq,
-            event: events[0],
-        });
-        timed_events.push(TimedEvent {
-            timing: quarter * ppq,
-            event: events[1],
-        });
-        timed_events.push(TimedEvent {
-            timing: quarter * ppq,
-            event: events[2],
-        });
-        timed_events.push(TimedEvent {
-            timing: quarter * ppq + len as u32,
-            event: events[3],
-        });
-        timed_events.push(TimedEvent {
-            timing: quarter * ppq + len as u32,
-            event: events[4],
-        });
-        timed_events.push(TimedEvent {
-            timing: quarter * ppq + len as u32,
-            event: events[5],
-        });
-    }
-    timed_events
-}
 
 pub fn schedule(
     offset: u64,
@@ -90,7 +23,6 @@ pub fn schedule(
 
     for te in timed_events.iter() {
         let data = match te.event {
-            Event::Rest => continue,
             Event::NoteOn {
                 channel,
                 note,
@@ -157,6 +89,7 @@ mod tests {
         timings.dedup();
         let ns_per_ms = 1_000_000;
 
+        // even timings are note ons, odds are note offs
         assert_eq!(timings[0] - timestamp, 0 as u64);
         assert_eq!(
             timings[2] - timestamp,
