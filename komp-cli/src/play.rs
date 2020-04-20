@@ -37,7 +37,7 @@ fn ticks_to_time(offset: u64, ticks: u32, ms_per_quarter: u32, ticks_per_quarter
     offset + (NS_PER_MS * ticks as u64 * ms_per_quarter as u64 / ticks_per_quarter as u64)
 }
 
-pub fn schedule_timeslice(
+fn schedule_timeslice(
     pattern_start: u64,
     now: u64,
     timeslice: u64,
@@ -85,6 +85,77 @@ pub fn schedule_timeslice(
     packet_buf
 }
 
+struct Scheduler {
+    pattern_start: u64,
+    slice_length: u64,
+    scheduling_deadline_margin: u64,
+    timed_events: Vec<TimedEvent>,
+    pattern_length: u64,
+    ms_per_quarter: u32,
+    ticks_per_quarter: u32,
+}
+
+impl Scheduler {
+    pub fn new(
+        pattern_start: u64,
+        slice_length: u64,
+        scheduling_deadline_margin: u64,
+        timed_events: Vec<TimedEvent>,
+        pattern_length: u64,
+        ms_per_quarter: u32,
+        ticks_per_quarter: u32,
+    ) -> Scheduler {
+        Scheduler {
+            pattern_start,
+            slice_length,
+            scheduling_deadline_margin,
+            timed_events,
+            pattern_length,
+            ms_per_quarter,
+            ticks_per_quarter,
+        }
+    }
+
+    pub fn schedule_slice(
+        &mut self,
+        now: u64,
+        slice_start: &mut u64,
+        key: Key,
+    ) -> (i64, coremidi::PacketBuffer) {
+        *slice_start = std::cmp::max(*slice_start, self.pattern_start);
+
+        let packet_buf = schedule_timeslice(
+            self.pattern_start,
+            *slice_start,
+            self.slice_length,
+            &self.timed_events,
+            self.pattern_length,
+            key,
+            self.ms_per_quarter,
+            self.ticks_per_quarter,
+        );
+
+        *slice_start += self.slice_length;
+        let next_slice_due = *slice_start;
+        if next_slice_due >= self.pattern_start + self.pattern_length {
+            self.pattern_start += self.pattern_length;
+        }
+        let sleep_time: i64 = ((next_slice_due - self.scheduling_deadline_margin) - (now)) as i64;
+
+        (sleep_time, packet_buf)
+    }
+
+    pub fn pattern_start(&self) -> u64 {
+        self.pattern_start
+    }
+    pub fn pattern_length(&self) -> u64 {
+        self.pattern_length
+    }
+    pub fn slice_length(&self) -> u64 {
+        self.slice_length
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +163,85 @@ mod tests {
     use crate::Playing;
     use komp_core::C_KEY;
     use std::collections::HashSet;
+
+    fn create_scheduler() -> Scheduler {
+        let pattern_start = 200_000_000_000_000;
+        let ticks_per_quarter = 96;
+        let ms_per_quarter = 500;
+        let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
+        let timed_events = create_bars(ticks_per_quarter, &progression);
+        let slice_length = 200 * NS_PER_MS;
+        // two bars at this tempo is exactly 4 seconds
+        let pattern_length = 4_000 * NS_PER_MS;
+        let scheduling_deadline_margin = 50 * NS_PER_MS;
+
+        Scheduler::new(
+            pattern_start,
+            slice_length,
+            scheduling_deadline_margin,
+            timed_events,
+            pattern_length,
+            ms_per_quarter,
+            ticks_per_quarter,
+        )
+    }
+
+    #[test]
+    fn test_scheduler_multiple_loops() {
+        let mut scheduler = create_scheduler();
+        let mut initial_start = scheduler.pattern_start();
+        let mut now = scheduler.pattern_start();
+        let mut slice_start = 0;
+
+        while slice_start + scheduler.slice_length()
+            <= initial_start + 160 * scheduler.pattern_length()
+        {
+            let (sleep_time, _) = scheduler.schedule_slice(now, &mut slice_start, C_KEY);
+
+            // use wrapping add to simulate adding a negative number
+            now = now.wrapping_add(sleep_time as u64);
+        }
+        assert!(initial_start < scheduler.pattern_start());
+        assert_eq!(slice_start, scheduler.pattern_start());
+    }
+
+    #[test]
+    fn test_scheduler() {
+        let mut scheduler = create_scheduler();
+        let mut initial_start = scheduler.pattern_start();
+        let mut now = initial_start;
+        let mut playing = vec![];
+        let mut played = HashSet::new();
+        let wake_up_jitter = [-10_000_123, 20_123_234, -30_000_123, 10_456_234, 70_000_001];
+        let mut slices = 0;
+        let mut slice_start = now;
+
+        while slice_start + scheduler.slice_length()
+            <= initial_start + 2 * scheduler.pattern_length()
+        {
+            let (sleep_time, packet_buf) = scheduler.schedule_slice(now, &mut slice_start, C_KEY);
+            for packet in packet_buf.iter() {
+                for chunk in packet.data().chunks(3) {
+                    crate::process_midi(chunk, &mut playing);
+                    played.insert(playing.clone());
+                }
+            }
+            // use wrapping add to simulate adding a negative number
+            now = now
+                .wrapping_add((sleep_time + wake_up_jitter[slices % wake_up_jitter.len()]) as u64);
+            slices += 1;
+        }
+
+        assert!(slice_start == initial_start + 2 * scheduler.pattern_length());
+        assert_eq!(slice_start, scheduler.pattern_start());
+        assert_eq!(playing, vec![]);
+
+        let f_major = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+        let c_major = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+        assert!(played.contains(&vec![]));
+        assert!(played.contains(&c_major));
+        assert!(played.contains(&f_major));
+    }
 
     #[test]
     fn test_continual_scheduling() {
@@ -103,10 +253,14 @@ mod tests {
         let slice_length = 200 * NS_PER_MS;
         // two bars at this tempo is exactly 4 seconds
         let pattern_length = 4_000 * NS_PER_MS;
+        let scheduling_deadline_margin = 50 * NS_PER_MS;
 
         let mut slice_start = pattern_start;
+        let mut now = pattern_start;
         let mut playing = vec![];
         let mut played = HashSet::new();
+        let wake_up_jitter = [-10_000_123, 20_123_234, -30_000_123, 10_456_234, 70_000_001];
+        let mut slices = 0;
         while slice_start + slice_length <= pattern_start + 2 * pattern_length {
             let packet_buf = schedule_timeslice(
                 pattern_start,
@@ -122,12 +276,19 @@ mod tests {
             for packet in packet_buf.iter() {
                 for chunk in packet.data().chunks(3) {
                     crate::process_midi(chunk, &mut playing);
+                    played.insert(playing.clone());
                 }
             }
-            played.insert(playing.clone());
 
             slice_start += slice_length;
+            let slice_end_time = slice_start;
+            // sleep until slice_end_time - scheduling_deadline_margin
+            let sleep_time = (slice_end_time - scheduling_deadline_margin) - now;
+            // use wrapping add to simulate adding a negative number
+            now += sleep_time.wrapping_add(wake_up_jitter[slices % wake_up_jitter.len()] as u64);
+            slices += 1;
         }
+        // assert!(false); // faked failure to see output
 
         assert!(slice_start == pattern_start + 2 * pattern_length);
         assert_eq!(playing, vec![]);
