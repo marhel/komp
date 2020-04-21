@@ -12,15 +12,16 @@ pub enum Event {
 
 use komp_core::*;
 pub const NS_PER_MS: u64 = 1_000_000;
+pub const NS_PER_US: u64 = 1_000;
 
 pub fn schedule(
     offset: u64,
     timed_events: Vec<TimedEvent>,
     key: Key,
-    ms_per_quarter: u32,
+    us_per_quarter: u32,
     ticks_per_quarter: u32,
 ) -> coremidi::PacketBuffer {
-    let one_bar = ms_per_quarter as u64 * 4 * NS_PER_MS;
+    let one_bar = us_per_quarter as u64 * 4 * NS_PER_US;
     schedule_timeslice(
         offset,
         offset,
@@ -28,13 +29,13 @@ pub fn schedule(
         &timed_events,
         one_bar,
         key,
-        ms_per_quarter,
+        us_per_quarter,
         ticks_per_quarter,
     )
 }
 
-fn ticks_to_time(offset: u64, ticks: u32, ms_per_quarter: u32, ticks_per_quarter: u32) -> u64 {
-    offset + (NS_PER_MS * ticks as u64 * ms_per_quarter as u64 / ticks_per_quarter as u64)
+fn ticks_to_time(offset: u64, ticks: u32, us_per_quarter: u32, ticks_per_quarter: u32) -> u64 {
+    offset + (NS_PER_US * ticks as u64 * us_per_quarter as u64 / ticks_per_quarter as u64)
 }
 
 fn schedule_timeslice(
@@ -44,13 +45,13 @@ fn schedule_timeslice(
     timed_events: &Vec<TimedEvent>,
     pattern_length: u64,
     key: Key,
-    ms_per_quarter: u32,
+    us_per_quarter: u32,
     ticks_per_quarter: u32,
 ) -> coremidi::PacketBuffer {
     let mut packet_buf = coremidi::PacketBuffer::with_capacity(512);
     for te in timed_events.iter() {
         let mut event_time =
-            ticks_to_time(pattern_start, te.timing, ms_per_quarter, ticks_per_quarter);
+            ticks_to_time(pattern_start, te.timing, us_per_quarter, ticks_per_quarter);
         if now + timeslice >= pattern_start + pattern_length {
             while event_time < now {
                 event_time += pattern_length;
@@ -91,7 +92,7 @@ pub struct Scheduler {
     scheduling_deadline_margin: u64,
     timed_events: Vec<TimedEvent>,
     pattern_length: u64,
-    ms_per_quarter: u32,
+    us_per_quarter: u32,
     ticks_per_quarter: u32,
 }
 
@@ -102,7 +103,7 @@ impl Scheduler {
         scheduling_deadline_margin: u64,
         timed_events: Vec<TimedEvent>,
         pattern_length: u64,
-        ms_per_quarter: u32,
+        us_per_quarter: u32,
         ticks_per_quarter: u32,
     ) -> Scheduler {
         Scheduler {
@@ -111,7 +112,7 @@ impl Scheduler {
             scheduling_deadline_margin,
             timed_events,
             pattern_length,
-            ms_per_quarter,
+            us_per_quarter,
             ticks_per_quarter,
         }
     }
@@ -131,7 +132,7 @@ impl Scheduler {
             &self.timed_events,
             self.pattern_length,
             key,
-            self.ms_per_quarter,
+            self.us_per_quarter,
             self.ticks_per_quarter,
         );
 
@@ -167,7 +168,7 @@ mod tests {
     fn create_scheduler() -> Scheduler {
         let pattern_start = 200_000_000_000_000;
         let ticks_per_quarter = 96;
-        let ms_per_quarter = 500;
+        let us_per_quarter = 500_000;
         let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
         let timed_events = create_bars(ticks_per_quarter, &progression);
         let slice_length = 200 * NS_PER_MS;
@@ -181,7 +182,7 @@ mod tests {
             scheduling_deadline_margin,
             timed_events,
             pattern_length,
-            ms_per_quarter,
+            us_per_quarter,
             ticks_per_quarter,
         )
     }
@@ -247,7 +248,7 @@ mod tests {
     fn test_continual_scheduling() {
         let pattern_start = 200_000_000_000_000;
         let ticks_per_quarter = 96;
-        let ms_per_quarter = 500;
+        let us_per_quarter = 500_000;
         let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
         let timed_events = create_bars(ticks_per_quarter, &progression);
         let slice_length = 200 * NS_PER_MS;
@@ -269,7 +270,7 @@ mod tests {
                 &timed_events,
                 pattern_length,
                 C_KEY,
-                ms_per_quarter,
+                us_per_quarter,
                 ticks_per_quarter,
             );
 
@@ -313,7 +314,7 @@ mod tests {
 
     fn package_pattern_timeslice(pattern_start: u64, now: u64) -> coremidi::PacketBuffer {
         let ticks_per_quarter = 96;
-        let ms_per_quarter = 500;
+        let us_per_quarter = 500_000;
         let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
         let timed_events = create_bars(ticks_per_quarter, &progression);
         let two_hundred_and_fifty_ms = 250 * NS_PER_MS;
@@ -326,7 +327,7 @@ mod tests {
             &timed_events,
             pattern_length,
             C_KEY,
-            ms_per_quarter,
+            us_per_quarter,
             ticks_per_quarter,
         )
     }
@@ -408,7 +409,7 @@ mod tests {
 
     fn create_packets(
         ticks_per_quarter: u32,
-        ms_per_quarter: u32,
+        us_per_quarter: u32,
     ) -> (u64, coremidi::PacketBuffer) {
         let timed_events = create_bar(ticks_per_quarter, Chord::Major(C_KEY));
         let timestamp = crate::now();
@@ -416,14 +417,14 @@ mod tests {
             timestamp,
             timed_events,
             C_KEY,
-            ms_per_quarter,
+            us_per_quarter,
             ticks_per_quarter,
         );
 
         (timestamp, packet_buf)
     }
 
-    fn assert_timings(packet_buf: coremidi::PacketBuffer, timestamp: u64, ms_per_quarter: u32) {
+    fn assert_timings(packet_buf: coremidi::PacketBuffer, timestamp: u64, us_per_quarter: u32) {
         assert_ne!(packet_buf.len(), 0);
 
         let timings = extract_timings(&packet_buf);
@@ -432,51 +433,51 @@ mod tests {
         assert_eq!(timings[0] - timestamp, 0 as u64);
         assert_eq!(
             timings[2] - timestamp,
-            1 * ms_per_quarter as u64 * NS_PER_MS
+            1 * us_per_quarter as u64 * NS_PER_US
         );
         assert_eq!(
             timings[4] - timestamp,
-            2 * ms_per_quarter as u64 * NS_PER_MS
+            2 * us_per_quarter as u64 * NS_PER_US
         );
         assert_eq!(
             timings[6] - timestamp,
-            3 * ms_per_quarter as u64 * NS_PER_MS
+            3 * us_per_quarter as u64 * NS_PER_US
         );
     }
 
     #[test]
     fn test_chord_part_scheduled_timing_lores() {
         let ticks_per_quarter = 16;
-        let ms_per_quarter = 500;
-        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
+        let us_per_quarter = 500_000;
+        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, us_per_quarter);
 
-        assert_timings(packet_buf, timestamp, ms_per_quarter)
+        assert_timings(packet_buf, timestamp, us_per_quarter)
     }
 
     #[test]
     fn test_chord_part_scheduled_timing_lores_slow() {
         let ticks_per_quarter = 16;
-        let ms_per_quarter = 500_000;
-        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
+        let us_per_quarter = 500_000_000;
+        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, us_per_quarter);
 
-        assert_timings(packet_buf, timestamp, ms_per_quarter)
+        assert_timings(packet_buf, timestamp, us_per_quarter)
     }
 
     #[test]
     fn test_chord_part_scheduled_timing_hires() {
         let ticks_per_quarter = 96_000;
-        let ms_per_quarter = 500;
-        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
+        let us_per_quarter = 500_000;
+        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, us_per_quarter);
 
-        assert_timings(packet_buf, timestamp, ms_per_quarter)
+        assert_timings(packet_buf, timestamp, us_per_quarter)
     }
 
     #[test]
     fn test_chord_part_scheduled_timing_hires_fast() {
         let ticks_per_quarter = 96_000;
-        let ms_per_quarter = 5;
-        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, ms_per_quarter);
+        let us_per_quarter = 5_000;
+        let (timestamp, packet_buf) = create_packets(ticks_per_quarter, us_per_quarter);
 
-        assert_timings(packet_buf, timestamp, ms_per_quarter)
+        assert_timings(packet_buf, timestamp, us_per_quarter)
     }
 }

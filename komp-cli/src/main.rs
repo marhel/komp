@@ -74,13 +74,12 @@ fn main() {
 
     let _handle = thread::spawn(move || {
         let ticks_per_quarter = 96;
-        let ms_per_quarter = 500;
+        let us_per_quarter = 500_000;
         let mut last_key = None;
         let mut timestamp = now();
         let timed_events = pattern::create_bar(ticks_per_quarter, Chord::MajorMaj7(C_KEY));
         let slice_length = 200 * NS_PER_MS;
-        // two bars at this tempo is exactly 4 seconds
-        let pattern_length = 4_000 * NS_PER_MS;
+        let pattern_length = 4 * us_per_quarter as u64 * NS_PER_US;
         let scheduling_deadline_margin = 50 * NS_PER_MS;
 
         let mut scheduler = play::Scheduler::new(
@@ -89,7 +88,7 @@ fn main() {
             scheduling_deadline_margin,
             timed_events,
             pattern_length,
-            ms_per_quarter,
+            us_per_quarter,
             ticks_per_quarter,
         );
 
