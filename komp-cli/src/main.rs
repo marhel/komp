@@ -15,6 +15,7 @@ mod pattern;
 mod play;
 mod setup;
 
+use crate::play::*;
 use crate::setup::*;
 use std::env;
 
@@ -72,35 +73,49 @@ fn main() {
     let output_port = client.output_port("komp-port").unwrap();
 
     let _handle = thread::spawn(move || {
-        let d = Duration::from_millis(3000);
         let ticks_per_quarter = 96;
         let ms_per_quarter = 500;
         let mut last_key = None;
-        let mut timestamp;
+        let mut timestamp = now();
+        let timed_events = pattern::create_bar(ticks_per_quarter, Chord::MajorMaj7(C_KEY));
+        let slice_length = 200 * NS_PER_MS;
+        // two bars at this tempo is exactly 4 seconds
+        let pattern_length = 4_000 * NS_PER_MS;
+        let scheduling_deadline_margin = 50 * NS_PER_MS;
+
+        let mut scheduler = play::Scheduler::new(
+            timestamp,
+            slice_length,
+            scheduling_deadline_margin,
+            timed_events,
+            pattern_length,
+            ms_per_quarter,
+            ticks_per_quarter,
+        );
+
+        let mut slice_start = 0;
         loop {
+            timestamp = now();
             let current_key = *read_current_chord.lock().unwrap();
             if last_key != current_key {
                 println!("T: {:?}", current_key);
-                if last_key.is_none() {
-                    timestamp = Some(now());
-                    coremidi::flush().expect("cannot flush coremidi queued events");
-                    let timed_events = pattern::create_bar(ticks_per_quarter, current_key.unwrap());
-                    let packet_buf = play::schedule(
-                        timestamp.unwrap(),
-                        timed_events,
-                        C_KEY,
-                        ms_per_quarter,
-                        ticks_per_quarter,
-                    );
-                    output_port
-                        .send(&destination, &packet_buf)
-                        .expect("cannot send MIDI packet");
-                }
                 last_key = current_key;
             } else {
                 print!(".")
             }
-            thread::sleep(d);
+            let (sleep_time, packet_buf) = scheduler.schedule_slice(
+                timestamp,
+                &mut slice_start,
+                current_key.map_or_else(|| C_KEY, |ch| *ch.key()),
+            );
+            output_port
+                .send(&destination, &packet_buf)
+                .expect("cannot send MIDI packet");
+            if sleep_time > 0 {
+                thread::sleep(Duration::from_nanos(sleep_time as u64));
+            } else {
+                println!("unexpected delay {}", sleep_time);
+            }
         }
     });
 

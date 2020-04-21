@@ -11,7 +11,7 @@ pub enum Event {
 }
 
 use komp_core::*;
-const NS_PER_MS: u64 = 1_000_000;
+pub const NS_PER_MS: u64 = 1_000_000;
 
 pub fn schedule(
     offset: u64,
@@ -85,7 +85,7 @@ fn schedule_timeslice(
     packet_buf
 }
 
-struct Scheduler {
+pub struct Scheduler {
     pattern_start: u64,
     slice_length: u64,
     scheduling_deadline_margin: u64,
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test_scheduler_multiple_loops() {
         let mut scheduler = create_scheduler();
-        let mut initial_start = scheduler.pattern_start();
+        let initial_start = scheduler.pattern_start();
         let mut now = scheduler.pattern_start();
         let mut slice_start = 0;
 
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     fn test_scheduler() {
         let mut scheduler = create_scheduler();
-        let mut initial_start = scheduler.pattern_start();
+        let initial_start = scheduler.pattern_start();
         let mut now = initial_start;
         let mut playing = vec![];
         let mut played = HashSet::new();
