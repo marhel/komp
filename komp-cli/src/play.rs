@@ -14,26 +14,6 @@ use komp_core::*;
 pub const NS_PER_MS: u64 = 1_000_000;
 pub const NS_PER_US: u64 = 1_000;
 
-pub fn schedule(
-    offset: u64,
-    timed_events: Vec<TimedEvent>,
-    key: Key,
-    us_per_quarter: u32,
-    ticks_per_quarter: u32,
-) -> coremidi::PacketBuffer {
-    let one_bar = us_per_quarter as u64 * 4 * NS_PER_US;
-    schedule_timeslice(
-        offset,
-        offset,
-        one_bar,
-        &timed_events,
-        one_bar,
-        key,
-        us_per_quarter,
-        ticks_per_quarter,
-    )
-}
-
 fn ticks_to_time(offset: u64, ticks: u32, us_per_quarter: u32, ticks_per_quarter: u32) -> u64 {
     offset + (NS_PER_US * ticks as u64 * us_per_quarter as u64 / ticks_per_quarter as u64)
 }
@@ -407,13 +387,33 @@ mod tests {
         assert_eq!(timings[1], note_ons);
     }
 
+    fn schedule_bar(
+        offset: u64,
+        timed_events: Vec<TimedEvent>,
+        key: Key,
+        us_per_quarter: u32,
+        ticks_per_quarter: u32,
+    ) -> coremidi::PacketBuffer {
+        let one_bar = us_per_quarter as u64 * 4 * NS_PER_US;
+        schedule_timeslice(
+            offset,
+            offset,
+            one_bar,
+            &timed_events,
+            one_bar,
+            key,
+            us_per_quarter,
+            ticks_per_quarter,
+        )
+    }
+
     fn create_packets(
         ticks_per_quarter: u32,
         us_per_quarter: u32,
     ) -> (u64, coremidi::PacketBuffer) {
         let timed_events = create_bar(ticks_per_quarter, Chord::Major(C_KEY));
         let timestamp = crate::now();
-        let packet_buf = schedule(
+        let packet_buf = schedule_bar(
             timestamp,
             timed_events,
             C_KEY,
