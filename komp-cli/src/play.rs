@@ -140,6 +140,8 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[macro_use]
+    use crate::*;
     use crate::pattern::*;
     use crate::Playing;
     use komp_core::C_KEY;
@@ -186,13 +188,19 @@ mod tests {
         assert_eq!(slice_start, scheduler.pattern_start());
     }
 
+    fn to_vec<T: Ord + Copy>(hashset: &HashSet<T>) -> Vec<T> {
+        let mut vec: Vec<T> = hashset.iter().map(|v| *v).collect();
+        vec.sort();
+        vec
+    }
+
     #[test]
     fn test_scheduler() {
         let mut scheduler = create_scheduler();
         let initial_start = scheduler.pattern_start();
         let mut now = initial_start;
-        let mut playing = vec![];
-        let mut played = HashSet::new();
+        let mut playing = hashset![];
+        let mut played: HashSet<Vec<ChannelNote>> = hashset![];
         let wake_up_jitter = [-10_000_123, 20_123_234, -30_000_123, 10_456_234, 70_000_001];
         let mut slices = 0;
         let mut slice_start = now;
@@ -204,7 +212,7 @@ mod tests {
             for packet in packet_buf.iter() {
                 for chunk in packet.data().chunks(3) {
                     crate::process_midi(chunk, &mut playing);
-                    played.insert(playing.clone());
+                    played.insert(to_vec(&playing));
                 }
             }
             // use wrapping add to simulate adding a negative number
@@ -215,7 +223,7 @@ mod tests {
 
         assert!(slice_start == initial_start + 2 * scheduler.pattern_length());
         assert_eq!(slice_start, scheduler.pattern_start());
-        assert_eq!(playing, vec![]);
+        assert_eq!(playing, hashset![]);
 
         let f_major = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
         let c_major = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
@@ -238,8 +246,8 @@ mod tests {
 
         let mut slice_start = pattern_start;
         let mut now = pattern_start;
-        let mut playing = vec![];
-        let mut played = HashSet::new();
+        let mut playing = hashset![];
+        let mut played: HashSet<Vec<ChannelNote>> = hashset![];
         let wake_up_jitter = [-10_000_123, 20_123_234, -30_000_123, 10_456_234, 70_000_001];
         let mut slices = 0;
         while slice_start + slice_length <= pattern_start + 2 * pattern_length {
@@ -257,7 +265,7 @@ mod tests {
             for packet in packet_buf.iter() {
                 for chunk in packet.data().chunks(3) {
                     crate::process_midi(chunk, &mut playing);
-                    played.insert(playing.clone());
+                    played.insert(to_vec(&playing));
                 }
             }
 
@@ -272,11 +280,12 @@ mod tests {
         // assert!(false); // faked failure to see output
 
         assert!(slice_start == pattern_start + 2 * pattern_length);
-        assert_eq!(playing, vec![]);
+        assert_eq!(playing, hashset![]);
 
         let f_major = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
         let c_major = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
         assert!(played.contains(&vec![]));
+        println!("{:?}", played);
         assert!(played.contains(&c_major));
         assert!(played.contains(&f_major));
     }
@@ -335,8 +344,8 @@ mod tests {
 
         // pretend that a C Major chord is playing in octave 3
         // afterwards the currently playing notes should be a F Major chord
-        let playing = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
-        let afterwards = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+        let playing = hashset![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+        let afterwards = hashset![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
 
         verify_playing(&packet_buf, playing, afterwards);
     }
@@ -366,8 +375,8 @@ mod tests {
 
         // pretend that a F Major chord is playing in octave 3
         // afterwards the currently playing notes should be a C Major chord
-        let playing = vec![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
-        let afterwards = vec![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
+        let playing = hashset![(0, NOTE_F3), (0, NOTE_A3), (0, NOTE_C4)];
+        let afterwards = hashset![(0, NOTE_C3), (0, NOTE_E3), (0, NOTE_G3)];
 
         verify_playing(&packet_buf, playing, afterwards);
     }

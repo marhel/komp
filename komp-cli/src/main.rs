@@ -52,7 +52,7 @@ fn main() {
 
     let client = coremidi::Client::new("komp-client").expect("cannot create coremidi client");
 
-    let mut playing: Vec<(u8, u8)> = vec![];
+    let mut playing: Playing = HashSet::new();
     let receive_midi = move |packet_list: &coremidi::PacketList| {
         let mut was_playing = playing.clone();
 
@@ -136,19 +136,11 @@ fn now() -> u64 {
 }
 
 fn detect_chord(
-    was_playing: &mut Vec<(u8, u8)>,
-    playing: &mut Vec<(u8, u8)>,
+    was_playing: &mut Playing,
+    playing: &mut Playing,
     current_chord_mutex: &Arc<Mutex<Option<Chord>>>,
 ) {
-    was_playing.sort();
-    was_playing.dedup();
-    playing.sort();
-    playing.dedup();
-    let was_modified = was_playing.len() != playing.len()
-        || was_playing
-            .iter()
-            .zip(playing.clone())
-            .any(|(a, b)| *a != b);
+    let was_modified = was_playing != playing;
 
     let name = [
         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -184,9 +176,10 @@ const CHANNEL_MASK: u8 = 0x0F;
 const CONTROLLER: u8 = 0xB0;
 const NOTE_ON: u8 = 0x90;
 const NOTE_OFF: u8 = 0x80;
+use std::collections::HashSet;
 
 type ChannelNote = (u8, u8);
-type Playing = Vec<ChannelNote>;
+type Playing = HashSet<ChannelNote>;
 
 fn process_midi<'a>(data: &[u8], playing: &'a mut Playing) {
     if data.len() == 1 && data[0] == ACTIVE_SENSE {
@@ -205,13 +198,24 @@ fn process_midi<'a>(data: &[u8], playing: &'a mut Playing) {
     match command {
         CONTROLLER => (), // controller
         NOTE_ON if velocity > 0 => {
-            playing.push((channel, note));
+            playing.insert((channel, note));
         }
         NOTE_ON | NOTE_OFF if command != NOTE_ON || velocity == 0 => {
-            playing.retain(|(ch, n)| channel != *ch || note != *n);
+            playing.remove(&(channel, note));
         }
         _ => println!("Unknown command {} in packet {:?}", command, data),
     };
+}
+
+#[macro_export]
+macro_rules! hashset {
+    ($($x:expr),*) => {
+        {
+            let mut p = HashSet::new();
+            $(p.insert($x);)*
+            p
+        }
+    }
 }
 
 #[cfg(test)]
@@ -221,22 +225,23 @@ mod tests {
     #[test]
     fn test_note_on() {
         let data = vec![0x93, 0x3c, 0x40];
-        let mut playing = vec![];
+        let mut playing = HashSet::new();
         process_midi(&data, &mut playing);
-        assert_eq!(playing, vec![(0x03, 0x3c)]);
+        assert_eq!(playing, hashset![(0x03, 0x3c)]);
     }
+
     #[test]
     fn test_note_off() {
         let data = vec![0x83, 0x3c, 0x40];
-        let mut playing = vec![(0x03, 0x3c), (0x03, 0x40), (0x04, 0x3c)];
+        let mut playing = hashset![(0x03, 0x3c), (0x03, 0x40), (0x04, 0x3c)];
         process_midi(&data, &mut playing);
-        assert_eq!(playing, vec![(0x03, 0x40), (0x04, 0x3c)]);
+        assert_eq!(playing, hashset![(0x03, 0x40), (0x04, 0x3c)]);
     }
     #[test]
     fn test_note_on_velocity_0() {
         let data = vec![0x93, 0x3c, 0x00];
-        let mut playing = vec![(0x03, 0x3c), (0x03, 0x40), (0x04, 0x3c)];
+        let mut playing = hashset![(0x03, 0x3c), (0x03, 0x40), (0x04, 0x3c)];
         process_midi(&data, &mut playing);
-        assert_eq!(playing, vec![(0x03, 0x40), (0x04, 0x3c)]);
+        assert_eq!(playing, hashset![(0x03, 0x40), (0x04, 0x3c)]);
     }
 }
