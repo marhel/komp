@@ -147,13 +147,43 @@ mod tests {
     use komp_core::C_KEY;
     use std::collections::HashSet;
 
+    #[test]
+    fn test_note_accumulation() {
+        let pattern_length = 4_000 * NS_PER_MS;
+        let mut scheduler = create_scheduler_with_slice_length(pattern_length);
+        let initial_start = scheduler.pattern_start();
+        let mut now = initial_start;
+        let mut playing = hashset![];
+        let mut played = hashset![
+            (0u8, NOTE_C3),
+            (0u8, NOTE_E3),
+            (0u8, NOTE_G3),
+            (0u8, NOTE_F3),
+            (0u8, NOTE_A3),
+            (0u8, NOTE_C4)
+        ];
+        let mut slice_start = now;
+
+        let (sleep_time, packet_buf) = scheduler.schedule_slice(now, &mut slice_start, C_KEY);
+        for packet in packet_buf.iter() {
+            for chunk in packet.data().chunks(3) {
+                crate::extract_playing_notes(chunk, &mut playing, true);
+            }
+        }
+        assert_eq!(playing, played);
+    }
+
     fn create_scheduler() -> Scheduler {
+        let slice_length = 200 * NS_PER_MS;
+        create_scheduler_with_slice_length(slice_length)
+    }
+
+    fn create_scheduler_with_slice_length(slice_length: u64) -> Scheduler {
         let pattern_start = 200_000_000_000_000;
         let ticks_per_quarter = 96;
         let us_per_quarter = 500_000;
         let progression = [Chord::Major(C_KEY), Chord::Major(F_KEY)];
         let timed_events = create_bars(ticks_per_quarter, &progression);
-        let slice_length = 200 * NS_PER_MS;
         // two bars at this tempo is exactly 4 seconds
         let pattern_length = 4_000 * NS_PER_MS;
         let scheduling_deadline_margin = 50 * NS_PER_MS;

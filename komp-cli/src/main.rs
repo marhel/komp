@@ -182,6 +182,10 @@ type ChannelNote = (u8, u8);
 type Playing = HashSet<ChannelNote>;
 
 fn process_midi<'a>(data: &[u8], playing: &'a mut Playing) {
+    extract_playing_notes(data, playing, false)
+}
+
+fn extract_playing_notes<'a>(data: &[u8], playing: &'a mut Playing, accumulate_notes: bool) {
     if data.len() == 1 && data[0] == ACTIVE_SENSE {
         return;
     }
@@ -201,7 +205,9 @@ fn process_midi<'a>(data: &[u8], playing: &'a mut Playing) {
             playing.insert((channel, note));
         }
         NOTE_ON | NOTE_OFF if command != NOTE_ON || velocity == 0 => {
-            playing.remove(&(channel, note));
+            if !accumulate_notes {
+                playing.remove(&(channel, note));
+            }
         }
         _ => println!("Unknown command {} in packet {:?}", command, data),
     };
