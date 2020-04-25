@@ -333,8 +333,27 @@ pub fn detect_chord(sounding: &Vec<u8>) -> Vec<Chord> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    macro_rules! count {
+        (@single $_t:tt) => { () };
+        // construct an unit array literal (with as many unit literals
+        // as tokens the macro is called with) and call the len method
+        ($($tts:tt)*) => {<[()]>::len(&[$(count!(@single $tts)),*])};
+    }
     macro_rules! test_key {
+        ($name:ident, $chord:ident, $key:ident, $tchord:ident, $tkey:ident, $($inversion:literal)*) => {
+            #[test]
+            fn $name() {
+                let chord = Chord::$chord($key);
+                let target_chord = Chord::$tchord($key + $tkey);
+                // count number of inversion tokens
+                let inversion = count!($($inversion)*) as u8;
+                assert_eq!(
+                    detect_chord(&chord.notes(4, inversion)),
+                    vec![target_chord],
+                    "inversion {}", inversion
+                );
+            }
+        };
         ($name:ident, $chord:ident, $key:ident, $inversion:literal) => {
             #[test]
             fn $name() {
@@ -366,13 +385,22 @@ mod tests {
               test_key!(i4, $chord, $key, 4);
           }
       };
-      ($modname:ident, $chord:ident, $key:ident, [ $($iname:ident : $n:literal => $tchord:ident/$tkey:ident),* ]) => {
+      (@recursive $chord:ident, $key:ident, $($inversion:literal)*, [ $iname:ident => $tchord:ident/$tkey:ident ]) => {
+          // keep track of inversion number by passing on that many tokens
+          test_key!($iname, $chord, $key, $tchord, $tkey, $($inversion)*);
+      };
+      (@recursive $chord:ident, $key:ident, $($inversion:literal)*, [ $iname:ident => $tchord:ident/$tkey:ident, $($riname:ident => $rtchord:ident/$rtkey:ident),* ]) => {
+          // keep track of inversion number by passing on that many tokens
+          test_key!($iname, $chord, $key, $tchord, $tkey, $($inversion)*);
+          // and add one more 1u8 token for the next recursion
+          inversion_test!(@recursive $chord, $key, $($inversion)* 1u8, [ $($riname => $rtchord/$rtkey),* ]);
+      };
+      ($modname:ident, $chord:ident, $key:ident, [ $($iname:ident => $tchord:ident/$tkey:ident),* ]) => {
           mod $modname {
               use super::*;
               test_key!(i0, $chord, $key, 0);
-              $(
-                  test_key!($iname, $chord, $key, $n, $tchord, $tkey);
-              )*
+              // keep track of inversion number by passing on that many tokens, here a single 1u8
+              inversion_test!(@recursive $chord, $key, 1u8, [ $($iname => $tchord/$tkey),* ]);
           }
       };
   }
@@ -401,16 +429,16 @@ mod tests {
     detect! {
         detect_major: Major all,
         detect_minor: Minor all,
-        detect_aug: Aug [ i1:1 => Aug/E_KEY, i2:2 => Aug/GSHARP_KEY ],
+        detect_aug: Aug [ i1 => Aug/E_KEY, i2 => Aug/GSHARP_KEY ],
         detect_dim: Dim all,
-        detect_dim7: Dim7 [ i1:1 => Dim7/DSHARP_KEY, i2:2 => Dim7/FSHARP_KEY, i3:3 => Dim7/A_KEY ],
-        detect_sus2: Sus2 [ i1:1 => Sus4/G_KEY, i2:2 => Sus4/G_KEY ], /* i1: 1 => sus4|sus2, i2: 2 => sus4 */
-        detect_sus4: Sus4 [ i1:1 => Sus2/F_KEY, i2:2 => Sus4/C_KEY ], /* i1: 1 => sus2, i2: 2 => sus4|sus4 */
+        detect_dim7: Dim7 [ i1 => Dim7/DSHARP_KEY, i2 => Dim7/FSHARP_KEY, i3 => Dim7/A_KEY ],
+        detect_sus2: Sus2 [ i1 => Sus4/G_KEY, i2 => Sus4/G_KEY ], /* i1: 1 => sus4|sus2, i2: 2 => sus4 */
+        detect_sus4: Sus4 [ i1 => Sus2/F_KEY, i2 => Sus4/C_KEY ], /* i1: 1 => sus2, i2: 2 => sus4|sus4 */
         detect_five: Five all,
         detect_sevensus4: SevenSus4 all,
-        detect_major6: Major6 [ i1:1 => Minor7/A_KEY, i2:2 => Minor7/A_KEY, i3:3 => Minor7/A_KEY ], /* i1: 1 => m7|6, i2: 2 => m7|6, i3: 3 => m7 */
-        detect_minor6: Minor6 [ i1:1 => Minor7b5/A_KEY, i2:2 => Minor7b5/A_KEY, i3:3 => Minor7b5/A_KEY ], /* i1: 1 => m7b5|m6, i2: 2 => m7b5|m6, i3: 3 => m7b5 */
-        detect_major6_9: Major6_9 [ i1:1 => Minor7_11/A_KEY, i2:2 => Minor7_11/A_KEY, i3:3 => Minor7_11/A_KEY, i4:4 => Minor7_11/A_KEY ], /* i1: 1 => m7_11|6, i2: 2 => m7_11|6, i3: 3 => m7_11|6, i4: 4 => m7_11 */
+        detect_major6: Major6 [ i1 => Minor7/A_KEY, i2 => Minor7/A_KEY, i3 => Minor7/A_KEY ], /* i1: 1 => m7|6, i2: 2 => m7|6, i3: 3 => m7 */
+        detect_minor6: Minor6 [ i1 => Minor7b5/A_KEY, i2 => Minor7b5/A_KEY, i3 => Minor7b5/A_KEY ], /* i1: 1 => m7b5|m6, i2: 2 => m7b5|m6, i3: 3 => m7b5 */
+        detect_major6_9: Major6_9 [ i1 => Minor7_11/A_KEY, i2 => Minor7_11/A_KEY, i3 => Minor7_11/A_KEY, i4 => Minor7_11/A_KEY ], /* i1: 1 => m7_11|6, i2: 2 => m7_11|6, i3: 3 => m7_11|6, i4: 4 => m7_11 */
         detect_minor6_9: Minor6_9 all,
         detect_major7: Major7 all,
         detect_major7_9: Major7_9 all,
@@ -420,11 +448,11 @@ mod tests {
         detect_major7b13: Major7b13 all,
         detect_major7_13: Major7_13 all,
         detect_major7aug: Major7Aug all,
-        detect_minor7: Minor7 [ i1:1 => Major6/DSHARP_KEY, i2:2 => Minor7/C_KEY, i3:3 => Minor7/C_KEY ], /* i1: 1 => 6, i2: 2 => m7|6, i3: 3 => m7|6 */
+        detect_minor7: Minor7 [ i1 => Major6/DSHARP_KEY, i2 => Minor7/C_KEY, i3 => Minor7/C_KEY ], /* i1: 1 => 6, i2: 2 => m7|6, i3: 3 => m7|6 */
         detect_minor7_9: Minor7_9 all,
-        detect_minor7_11: Minor7_11 [ i1:1 => Major6_9/DSHARP_KEY, i2:2 => Minor7_11/C_KEY, i3:3 => Minor7_11/C_KEY, i4:4 => Minor7_11/C_KEY ], /* i1: 1 => 6_9, i2: 2 => m7_11|6_9, i3: 3 => m7_11|6_9, i4: 4 => m7_11|6_9 */
-        detect_major7b5: Major7b5 [ i1:1 => Major7b5/C_KEY, i2:2 => Major7b5/FSHARP_KEY, i3:3 => Major7b5/FSHARP_KEY ],
-        detect_minor7b5: Minor7b5 [ i1:1 => Minor6/DSHARP_KEY, i2:2 => Minor7b5/C_KEY, i3:3 => Minor7b5/C_KEY ], /* i1: 1 => m6, i2: 2 => m6|m7b5, i3: 3 => m6|m7b5 */
+        detect_minor7_11: Minor7_11 [ i1 => Major6_9/DSHARP_KEY, i2 => Minor7_11/C_KEY, i3 => Minor7_11/C_KEY, i4 => Minor7_11/C_KEY ], /* i1: 1 => 6_9, i2: 2 => m7_11|6_9, i3: 3 => m7_11|6_9, i4: 4 => m7_11|6_9 */
+        detect_major7b5: Major7b5 [ i1 => Major7b5/C_KEY, i2 => Major7b5/FSHARP_KEY, i3 => Major7b5/FSHARP_KEY ],
+        detect_minor7b5: Minor7b5 [ i1 => Minor6/DSHARP_KEY, i2 => Minor7b5/C_KEY, i3 => Minor7b5/C_KEY ], /* i1: 1 => m6, i2: 2 => m6|m7b5, i3: 3 => m6|m7b5 */
         detect_majormaj7: MajorMaj7 all,
         detect_majormaj7_9: MajorMaj7_9 all,
         detect_majormaj7plus11: MajorMaj7Plus11 all,
