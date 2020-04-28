@@ -70,6 +70,20 @@ fn midi_encode_event(event: &Event, key: Key) -> [u8; 3] {
     }
 }
 
+fn mute_playing(playing: &crate::Playing) -> coremidi::PacketBuffer {
+    let mut packet_buf = coremidi::PacketBuffer::with_capacity(512);
+    for &(channel, note) in playing {
+        let event = Event::NoteOn {
+            channel,
+            note,
+            velocity: 0,
+        };
+        let data = midi_encode_event(&event, C_KEY);
+        packet_buf.push_data(0, &data);
+    }
+    packet_buf
+}
+
 pub struct Scheduler {
     pattern_start: u64,
     slice_length: u64,
@@ -150,6 +164,20 @@ mod tests {
     use crate::Playing;
     use komp_core::C_KEY;
     use std::collections::HashSet;
+
+    #[test]
+    fn test_mute_playing() {
+        let mut playing = hashset![(1u8, NOTE_C3), (2u8, NOTE_G3)];
+
+        let packet_buf = mute_playing(&playing);
+
+        for packet in packet_buf.iter() {
+            for chunk in packet.data().chunks(3) {
+                crate::extract_playing_notes(chunk, &mut playing, false);
+            }
+        }
+        assert_eq!(playing.len(), 0);
+    }
 
     #[test]
     fn test_midi_encoding_note_on() {
