@@ -40,30 +40,34 @@ fn schedule_timeslice(
         if event_time < now || event_time >= now + timeslice {
             continue;
         }
-        let data = match te.event {
-            Event::NoteOn {
-                channel,
-                note,
-                velocity,
-            } => [
-                0x90 | (channel & 0x0f),
-                (key.0 + note) & 0x7f,
-                velocity & 0x7f,
-            ],
-            Event::NoteOff {
-                channel,
-                note,
-                velocity,
-            } => [
-                0x80 | (channel & 0x0f),
-                (key.0 + note) & 0x7f,
-                velocity & 0x7f,
-            ],
-        };
+        let data = midi_encode_event(&te.event, key);
         packet_buf.push_data(event_time, &data);
     }
 
     packet_buf
+}
+
+fn midi_encode_event(event: &Event, key: Key) -> [u8; 3] {
+    match event {
+        Event::NoteOn {
+            channel,
+            note,
+            velocity,
+        } => [
+            0x90 | (channel & 0x0f),
+            (key.0 + note) & 0x7f,
+            velocity & 0x7f,
+        ],
+        Event::NoteOff {
+            channel,
+            note,
+            velocity,
+        } => [
+            0x80 | (channel & 0x0f),
+            (key.0 + note) & 0x7f,
+            velocity & 0x7f,
+        ],
+    }
 }
 
 pub struct Scheduler {
@@ -146,6 +150,40 @@ mod tests {
     use crate::Playing;
     use komp_core::C_KEY;
     use std::collections::HashSet;
+
+    #[test]
+    fn test_midi_encoding_note_on() {
+        let channel = 0xc;
+        let note = NOTE_E3;
+        let velocity = 81;
+
+        let event = Event::NoteOn {
+            channel,
+            note,
+            velocity,
+        };
+
+        let data = midi_encode_event(&event, C_KEY);
+
+        assert_eq!(data, [0x9c, NOTE_E3, velocity]);
+    }
+
+    #[test]
+    fn test_midi_encoding_note_off() {
+        let channel = 0xc;
+        let note = NOTE_E3;
+        let velocity = 81;
+
+        let event = Event::NoteOff {
+            channel,
+            note,
+            velocity,
+        };
+
+        let data = midi_encode_event(&event, C_KEY);
+
+        assert_eq!(data, [0x8c, NOTE_E3, velocity]);
+    }
 
     #[test]
     fn test_note_accumulation() {
