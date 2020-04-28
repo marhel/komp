@@ -234,7 +234,8 @@ fn extract_playing_notes<'a>(data: &[u8], playing: &'a mut Playing, accumulate_n
 
 #[macro_export]
 macro_rules! hashset {
-    ($($x:expr),*) => {
+    () => { HashSet::new() };
+    ($($x:expr),+) => {
         {
             let mut p = HashSet::new();
             $(p.insert($x);)*

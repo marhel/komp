@@ -217,9 +217,9 @@ mod tests {
         let pattern_length = 4_000 * NS_PER_MS;
         let mut scheduler = create_scheduler_with_slice_length(pattern_length);
         let initial_start = scheduler.pattern_start();
-        let mut now = initial_start;
+        let now = initial_start;
         let mut playing = hashset![];
-        let mut played = hashset![
+        let played = hashset![
             (0u8, NOTE_C3),
             (0u8, NOTE_E3),
             (0u8, NOTE_G3),
@@ -229,7 +229,7 @@ mod tests {
         ];
         let mut slice_start = now;
 
-        let (sleep_time, packet_buf) = scheduler.schedule_slice(now, &mut slice_start, C_KEY);
+        let (_, packet_buf) = scheduler.schedule_slice(now, &mut slice_start, C_KEY);
         for packet in packet_buf.iter() {
             for chunk in packet.data().chunks(3) {
                 crate::extract_playing_notes(chunk, &mut playing, true);
