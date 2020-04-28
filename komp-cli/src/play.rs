@@ -70,7 +70,7 @@ fn midi_encode_event(event: &Event, key: Key) -> [u8; 3] {
     }
 }
 
-fn mute_playing(playing: &crate::Playing) -> coremidi::PacketBuffer {
+pub fn mute_playing(playing: &crate::Playing) -> coremidi::PacketBuffer {
     let mut packet_buf = coremidi::PacketBuffer::with_capacity(512);
     for &(channel, note) in playing {
         let event = Event::NoteOn {
@@ -158,10 +158,9 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[macro_use]
-    use crate::*;
     use crate::pattern::*;
     use crate::Playing;
+    use crate::*;
     use komp_core::C_KEY;
     use std::collections::HashSet;
 

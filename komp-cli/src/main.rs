@@ -93,10 +93,17 @@ fn main() {
         );
 
         let mut slice_start = 0;
+        let mut playing: Playing = hashset![];
         loop {
             timestamp = now();
             let current_key = *read_current_chord.lock().unwrap();
             if last_key != current_key {
+                // flush (drop) the rest of the scheduled slice, if any
+                coremidi::flush().expect("cannot flush scheduled MIDI packets");
+                let packet_buf = play::mute_playing(&playing);
+                output_port
+                    .send(&destination, &packet_buf)
+                    .expect("cannot send MIDI packet");
                 println!("T: {:?}", current_key);
                 last_key = current_key;
             } else {
@@ -107,6 +114,18 @@ fn main() {
                 &mut slice_start,
                 current_key.map_or_else(|| C_KEY, |ch| *ch.key()),
             );
+            // Keep track of notes playing in this slice.
+            // As we don't really know how much of the slice has been sent
+            // already if we need to abort it (due to a key change) just
+            // conservatively accumulate all note on messages here.
+            // Note that this might cause us to send more note-offs
+            // at key change than strictly necessary, but it should not be
+            // noticable and is very simple to do.
+            for packet in packet_buf.iter() {
+                for chunk in packet.data().chunks(3) {
+                    crate::extract_playing_notes(chunk, &mut playing, true);
+                }
+            }
             output_port
                 .send(&destination, &packet_buf)
                 .expect("cannot send MIDI packet");
