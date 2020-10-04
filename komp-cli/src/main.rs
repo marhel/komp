@@ -120,7 +120,7 @@ fn main() {
             // conservatively accumulate all note on messages here.
             // Note that this might cause us to send more note-offs
             // at key change than strictly necessary, but it should not be
-            // noticable and is very simple to do.
+            // noticeable and is very simple to do.
             for packet in packet_buf.iter() {
                 for chunk in packet.data().chunks(3) {
                     crate::extract_playing_notes(chunk, &mut playing, true);
