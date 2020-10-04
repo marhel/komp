@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_note_accumulation() {
         let pattern_length = 4_000 * NS_PER_MS;
-        let mut scheduler = create_scheduler_with_slice_length(pattern_length);
+        let mut scheduler = create_scheduler_for_c_f_with_slice_length(pattern_length);
         let initial_start = scheduler.pattern_start();
         let now = initial_start;
         let mut playing = hashset![];
@@ -240,10 +240,10 @@ mod tests {
 
     fn create_scheduler() -> Scheduler {
         let slice_length = 200 * NS_PER_MS;
-        create_scheduler_with_slice_length(slice_length)
+        create_scheduler_for_c_f_with_slice_length(slice_length)
     }
 
-    fn create_scheduler_with_slice_length(slice_length: u64) -> Scheduler {
+    fn create_scheduler_for_c_f_with_slice_length(slice_length: u64) -> Scheduler {
         let pattern_start = 200_000_000_000_000;
         let ticks_per_quarter = 96;
         let us_per_quarter = 500_000;
