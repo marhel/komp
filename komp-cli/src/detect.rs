@@ -91,12 +91,21 @@ fn interpret(chord_steps: Vec<&str>) -> Vec<(Option<u8>, u8)> {
     for v in chord_steps {
         match v {
             "C" => res.push((Some(komp_core::NOTE_C4), 1)),
+            "C#" => res.push((Some(komp_core::NOTE_CSHARP4), 1)),
+            "Db" => res.push((Some(komp_core::NOTE_DFLAT4), 1)),
             "D" => res.push((Some(komp_core::NOTE_D4), 1)),
-            "E" => res.push((Some(komp_core::NOTE_E4), 1)),
+            "D#" => res.push((Some(komp_core::NOTE_DSHARP4), 1)),
             "Eb" => res.push((Some(komp_core::NOTE_EFLAT4), 1)),
+            "E" => res.push((Some(komp_core::NOTE_E4), 1)),
             "F" => res.push((Some(komp_core::NOTE_F4), 1)),
+            "F#" => res.push((Some(komp_core::NOTE_FSHARP4), 1)),
+            "Gb" => res.push((Some(komp_core::NOTE_GFLAT4), 1)),
             "G" => res.push((Some(komp_core::NOTE_G4), 1)),
+            "G#" => res.push((Some(komp_core::NOTE_GSHARP4), 1)),
+            "Ab" => res.push((Some(komp_core::NOTE_AFLAT4), 1)),
             "A" => res.push((Some(komp_core::NOTE_A4), 1)),
+            "A#" => res.push((Some(komp_core::NOTE_ASHARP4), 1)),
+            "Bb" => res.push((Some(komp_core::NOTE_BFLAT4), 1)),
             "B" => res.push((Some(komp_core::NOTE_B4), 1)),
             "-" => res.push((None, 1)),
             "_" => {
@@ -140,13 +149,22 @@ fn interpret_dsl(chord_change_dsl: &str) -> Vec<Vec<(Option<u8>, u8)>> {
 mod tests {
     use super::*;
     use komp_core::NOTE_A4;
+    use komp_core::NOTE_AFLAT4;
+    use komp_core::NOTE_ASHARP4;
     use komp_core::NOTE_B4;
+    use komp_core::NOTE_BFLAT4;
     use komp_core::NOTE_C4;
+    use komp_core::NOTE_CSHARP4;
     use komp_core::NOTE_D4;
+    use komp_core::NOTE_DFLAT4;
+    use komp_core::NOTE_DSHARP4;
     use komp_core::NOTE_E4;
     use komp_core::NOTE_EFLAT4;
     use komp_core::NOTE_F4;
+    use komp_core::NOTE_FSHARP4;
     use komp_core::NOTE_G4;
+    use komp_core::NOTE_GFLAT4;
+    use komp_core::NOTE_GSHARP4;
 
     #[test]
     fn test_chord_change_dsl_split() {
@@ -261,11 +279,21 @@ mod tests {
     }
 
     test_interpreter!(simple_c, "C", vec![(Some(NOTE_C4), 1)]);
+    test_interpreter!(simple_csharp, "C#", vec![(Some(NOTE_CSHARP4), 1)]);
+    test_interpreter!(simple_dflat, "Db", vec![(Some(NOTE_DFLAT4), 1)]);
     test_interpreter!(simple_d, "D", vec![(Some(NOTE_D4), 1)]);
+    test_interpreter!(simple_dsharp, "D#", vec![(Some(NOTE_DSHARP4), 1)]);
+    test_interpreter!(simple_eflat, "Eb", vec![(Some(NOTE_EFLAT4), 1)]);
     test_interpreter!(simple_e, "E", vec![(Some(NOTE_E4), 1)]);
     test_interpreter!(simple_f, "F", vec![(Some(NOTE_F4), 1)]);
+    test_interpreter!(simple_fsharp, "F#", vec![(Some(NOTE_FSHARP4), 1)]);
+    test_interpreter!(simple_gflat, "Gb", vec![(Some(NOTE_GFLAT4), 1)]);
     test_interpreter!(simple_g, "G", vec![(Some(NOTE_G4), 1)]);
+    test_interpreter!(simple_gsharp, "G#", vec![(Some(NOTE_GSHARP4), 1)]);
+    test_interpreter!(simple_aflat, "Ab", vec![(Some(NOTE_AFLAT4), 1)]);
     test_interpreter!(simple_a, "A", vec![(Some(NOTE_A4), 1)]);
+    test_interpreter!(simple_asharp, "A#", vec![(Some(NOTE_ASHARP4), 1)]);
+    test_interpreter!(simple_bflat, "Bb", vec![(Some(NOTE_BFLAT4), 1)]);
     test_interpreter!(simple_b, "B", vec![(Some(NOTE_B4), 1)]);
     test_interpreter!(c_len2, "C _", vec![(Some(NOTE_C4), 2)]);
     test_interpreter!(c_len3, "C _ _", vec![(Some(NOTE_C4), 3)]);
