@@ -93,6 +93,7 @@ fn interpret(chord_steps: Vec<&str>) -> Vec<(Option<u8>, u8)> {
             "C" => res.push((Some(komp_core::NOTE_C4), 1)),
             "D" => res.push((Some(komp_core::NOTE_D4), 1)),
             "E" => res.push((Some(komp_core::NOTE_E4), 1)),
+            "Eb" => res.push((Some(komp_core::NOTE_EFLAT4), 1)),
             "F" => res.push((Some(komp_core::NOTE_F4), 1)),
             "G" => res.push((Some(komp_core::NOTE_G4), 1)),
             "A" => res.push((Some(komp_core::NOTE_A4), 1)),
@@ -109,6 +110,32 @@ fn interpret(chord_steps: Vec<&str>) -> Vec<(Option<u8>, u8)> {
     res
 }
 
+fn interpret_dsl(chord_change_dsl: &str) -> Vec<Vec<(Option<u8>, u8)>> {
+    let parts = split_parts(chord_change_dsl);
+    let mut interpreted_parts = vec![];
+    for steps in parts {
+        interpreted_parts.push(interpret(steps));
+    }
+
+    fn sum_len(s: &Vec<(Option<u8>, u8)>) -> u8 {
+        s.iter().map(|i| i.1).sum()
+    }
+
+    let max_len: u8 = interpreted_parts
+        .iter()
+        .map(sum_len)
+        .max()
+        .expect("some steps");
+    for steps in interpreted_parts.iter_mut() {
+        let current_len: u8 = sum_len(steps);
+        if let Some(item) = steps.last_mut() {
+            *item = (item.0, max_len - current_len + item.1);
+        }
+    }
+
+    interpreted_parts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,6 +144,7 @@ mod tests {
     use komp_core::NOTE_C4;
     use komp_core::NOTE_D4;
     use komp_core::NOTE_E4;
+    use komp_core::NOTE_EFLAT4;
     use komp_core::NOTE_F4;
     use komp_core::NOTE_G4;
 
@@ -286,5 +314,62 @@ mod tests {
         c_d_e,
         "C D E",
         vec![(Some(NOTE_C4), 1), (Some(NOTE_D4), 1), (Some(NOTE_E4), 1)]
+    );
+
+    macro_rules! test_interpret_dsl {
+        ($name:ident, $change_dsl:expr, $il:expr) => {
+            #[test]
+            fn $name() {
+                let interpreted_parts = interpret_dsl($change_dsl);
+                let il = $il;
+                assert!(
+                    interpreted_parts.eq(&il),
+                    "{} \nbecame   {:?}\nexpected {:?}",
+                    $change_dsl,
+                    interpreted_parts,
+                    &il
+                );
+            }
+        };
+    }
+
+    test_interpret_dsl!(
+        c_to_cm_len2,
+        "C [E Eb] G",
+        vec![
+            vec![(Some(NOTE_C4), 2)],
+            vec![(Some(NOTE_E4), 1), (Some(NOTE_EFLAT4), 1)],
+            vec![(Some(NOTE_G4), 2)]
+        ]
+    );
+
+    test_interpret_dsl!(
+        c_to_cm_len3,
+        "C [E - Eb] [G -]",
+        vec![
+            vec![(Some(NOTE_C4), 3)],
+            vec![(Some(NOTE_E4), 1), (None, 1), (Some(NOTE_EFLAT4), 1)],
+            vec![(Some(NOTE_G4), 1), (None, 2)]
+        ]
+    );
+
+    test_interpret_dsl!(
+        c_to_cm_len3_variant2,
+        "C [E _ Eb] [G _]",
+        vec![
+            vec![(Some(NOTE_C4), 3)],
+            vec![(Some(NOTE_E4), 2), (Some(NOTE_EFLAT4), 1)],
+            vec![(Some(NOTE_G4), 3)]
+        ]
+    );
+
+    test_interpret_dsl!(
+        c_to_cm_len3_variant3,
+        "C [E Eb _] [G -]",
+        vec![
+            vec![(Some(NOTE_C4), 3)],
+            vec![(Some(NOTE_E4), 1), (Some(NOTE_EFLAT4), 2)],
+            vec![(Some(NOTE_G4), 1), (None, 2)]
+        ]
     );
 }
