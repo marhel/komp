@@ -1,9 +1,9 @@
-/** The Chord Change DSL
-space separates parallel steps, assumed to be of the same duration
-brackets means time passes between each step,
-_ means keep the previous key pressed,
-- means to release the previous key,
-key changes within brackets imply that the previous key is to be released first.
+/** The Chord Change DSL.
+- space separates parallel steps, assumed to be of the same duration
+- [] brackets means time passes between each step,
+- _ means keep the previous key pressed,
+- \- means to release the previous key,
+- key changes within brackets imply that the previous key is to be released first.
 
 So "C" means pressing the C key
 "C G" means pressing the C and G key together,
@@ -43,7 +43,7 @@ T1 2 3
 At T1, we press C E and G, at T2 we release C and press B, at T3 we release E and press D.
 */
 
-fn split(chord_change_dsl: &str) -> Vec<Vec<&str>> {
+fn split_parts(chord_change_dsl: &str) -> Vec<Vec<&str>> {
     let mut start = 0;
     let mut in_chunk = false;
     let mut was_chunk = false;
@@ -62,7 +62,7 @@ fn split(chord_change_dsl: &str) -> Vec<Vec<&str>> {
         if c == ' ' {
             if !in_chunk {
                 if !was_space {
-                    res.push(parts(&chord_change_dsl[start..chunk_len(i, was_chunk)]));
+                    res.push(steps(&chord_change_dsl[start..chunk_len(i, was_chunk)]));
                 }
                 start = i + 1;
             }
@@ -75,25 +75,50 @@ fn split(chord_change_dsl: &str) -> Vec<Vec<&str>> {
     }
     // add last segment
     if !in_chunk && start < chord_change_dsl.len() {
-        res.push(parts(
+        res.push(steps(
             &chord_change_dsl[start..chunk_len(chord_change_dsl.len(), was_chunk)],
         ));
     }
     res
 }
 
-fn parts(chord_change: &str) -> Vec<&str> {
+fn steps(chord_change: &str) -> Vec<&str> {
     chord_change.split_whitespace().collect()
 }
 
-fn interpret(chord_change: &str) -> Vec<(u8, u8)> {
-    vec![(crate::key::NOTE_C4, 1)]
+fn interpret(chord_steps: Vec<&str>) -> Vec<(Option<u8>, u8)> {
+    let mut res = vec![];
+    for v in chord_steps {
+        match v {
+            "C" => res.push((Some(komp_core::NOTE_C4), 1)),
+            "D" => res.push((Some(komp_core::NOTE_D4), 1)),
+            "E" => res.push((Some(komp_core::NOTE_E4), 1)),
+            "F" => res.push((Some(komp_core::NOTE_F4), 1)),
+            "G" => res.push((Some(komp_core::NOTE_G4), 1)),
+            "A" => res.push((Some(komp_core::NOTE_A4), 1)),
+            "B" => res.push((Some(komp_core::NOTE_B4), 1)),
+            "-" => res.push((None, 1)),
+            "_" => {
+                if let Some(last) = res.last_mut() {
+                    *last = (last.0, last.1 + 1)
+                }
+            }
+            _ => (),
+        }
+    }
+    res
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::key::*;
+    use komp_core::NOTE_A4;
+    use komp_core::NOTE_B4;
+    use komp_core::NOTE_C4;
+    use komp_core::NOTE_D4;
+    use komp_core::NOTE_E4;
+    use komp_core::NOTE_F4;
+    use komp_core::NOTE_G4;
 
     #[test]
     fn test_chord_change_dsl_split() {
@@ -166,12 +191,16 @@ mod tests {
 
         for (chord_change, components) in changes.iter() {
             // println!("{:?}", split(*chord_change));
-            assert!(split(*chord_change).eq(components), "{}", *chord_change);
+            assert!(
+                split_parts(*chord_change).eq(components),
+                "{}",
+                *chord_change
+            );
         }
     }
 
     #[test]
-    fn test_chord_change_dsl_parts() {
+    fn test_chord_change_dsl_steps() {
         let changes = [
             ("C", 1),
             ("C  -", 2),
@@ -181,31 +210,81 @@ mod tests {
         ];
 
         for (change, len) in changes.iter() {
-            assert_eq!(parts(*change).len(), *len as usize, "{}", *change);
+            assert_eq!(steps(*change).len(), *len as usize, "{}", *change);
         }
     }
 
-    #[test]
-    fn test_chord_change_dsl_interpreter() {
-        let press = |n| (n, 1);
-        let press_l = |n, l| (n, l);
-        let silence = || (0, 1);
-        let changes = [
-            ("C", vec![press(NOTE_C4)]),
-            ("C _", vec![press_l(NOTE_C4, 2)]),
-            ("C _ _", vec![press_l(NOTE_C4, 3)]),
-            ("C C", vec![press(NOTE_C4), press(NOTE_C4)]),
-            ("C _ C", vec![press_l(NOTE_C4, 2), press(NOTE_C4)]),
-            ("C _ _ C", vec![press_l(NOTE_C4, 3), press(NOTE_C4)]),
-            ("C -", vec![press(NOTE_C4), silence()]),
-            ("C - C", vec![press(NOTE_C4), silence(), press(NOTE_C4)]),
-            ("C D ", vec![press(NOTE_C4), press(NOTE_D4)]),
-            (" C - D ", vec![press(NOTE_C4), silence(), press(NOTE_D4)]),
-            ("  C   D   E  ", vec![press(NOTE_C4), press(NOTE_D4), press(NOTE_E4)]),
-        ];
-
-        for (change, il) in changes.iter() {
-            assert!(interpret(*change).eq(il), "{}", *change);
-        }
+    macro_rules! test_interpreter {
+        ($name:ident, $change:expr, $il:expr) => {
+            #[test]
+            fn $name() {
+                let steps = steps($change);
+                let res = interpret(steps);
+                let il = $il;
+                assert!(
+                    res.eq(&il),
+                    "{} became {:?} expected {:?}",
+                    $change,
+                    res,
+                    &il
+                );
+            }
+        };
     }
+
+    test_interpreter!(simple_c, "C", vec![(Some(NOTE_C4), 1)]);
+    test_interpreter!(simple_d, "D", vec![(Some(NOTE_D4), 1)]);
+    test_interpreter!(simple_e, "E", vec![(Some(NOTE_E4), 1)]);
+    test_interpreter!(simple_f, "F", vec![(Some(NOTE_F4), 1)]);
+    test_interpreter!(simple_g, "G", vec![(Some(NOTE_G4), 1)]);
+    test_interpreter!(simple_a, "A", vec![(Some(NOTE_A4), 1)]);
+    test_interpreter!(simple_b, "B", vec![(Some(NOTE_B4), 1)]);
+    test_interpreter!(c_len2, "C _", vec![(Some(NOTE_C4), 2)]);
+    test_interpreter!(c_len3, "C _ _", vec![(Some(NOTE_C4), 3)]);
+    test_interpreter!(
+        double_c,
+        "C C",
+        vec![(Some(NOTE_C4), 1), (Some(NOTE_C4), 1)]
+    );
+    test_interpreter!(
+        c_len2_c,
+        "C _ C",
+        vec![(Some(NOTE_C4), 2), (Some(NOTE_C4), 1)]
+    );
+    test_interpreter!(
+        c_len3_c,
+        "C _ _ C",
+        vec![(Some(NOTE_C4), 3), (Some(NOTE_C4), 1)]
+    );
+    test_interpreter!(
+        c_len2_c_len2,
+        "C _ C _",
+        vec![(Some(NOTE_C4), 2), (Some(NOTE_C4), 2)]
+    );
+    test_interpreter!(c_silence, "C -", vec![(Some(NOTE_C4), 1), (None, 1)]);
+    test_interpreter!(
+        c_silence_c,
+        "C - C",
+        vec![(Some(NOTE_C4), 1), (None, 1), (Some(NOTE_C4), 1)]
+    );
+    test_interpreter!(
+        c_silence_silence_c,
+        "C - - C",
+        vec![(Some(NOTE_C4), 1), (None, 1), (None, 1), (Some(NOTE_C4), 1)]
+    );
+    test_interpreter!(
+        c_silence_len2_c,
+        "C - _ C",
+        vec![(Some(NOTE_C4), 1), (None, 2), (Some(NOTE_C4), 1)]
+    );
+    test_interpreter!(
+        c_silence_d,
+        "C - D",
+        vec![(Some(NOTE_C4), 1), (None, 1), (Some(NOTE_D4), 1)]
+    );
+    test_interpreter!(
+        c_d_e,
+        "C D E",
+        vec![(Some(NOTE_C4), 1), (Some(NOTE_D4), 1), (Some(NOTE_E4), 1)]
+    );
 }
