@@ -27,7 +27,7 @@ fn create_note(
     )
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TimeCode {
     bar: u32,
     beat: u8,
@@ -40,6 +40,23 @@ impl TimeCode {
     }
     pub fn ticks(&self, ticks_per_quarter: u32) -> u32 {
         (self.bar * 4 + self.beat as u32) * ticks_per_quarter + self.tick
+    }
+}
+
+impl std::ops::Add for TimeCode {
+    type Output = Self;
+    fn add(self, rhs: TimeCode) -> TimeCode {
+        TimeCode {
+            bar: self.bar + rhs.bar,
+            beat: self.beat + rhs.beat,
+            tick: self.tick + rhs.tick,
+        }
+    }
+}
+
+impl std::cmp::PartialEq for TimeCode {
+    fn eq(&self, rhs: &TimeCode) -> bool {
+        self.ticks(1920) == rhs.ticks(1920)
     }
 }
 
@@ -138,6 +155,14 @@ mod tests {
         } else {
             unreachable!()
         }
+    }
+
+    #[test]
+    fn test_timecode_add() {
+        let one_one_one = TimeCode::new(1, 1, 1);
+        let two_two_two = TimeCode::new(2, 2, 2);
+
+        assert_eq!(one_one_one + one_one_one, two_two_two);
     }
 
     #[test]
