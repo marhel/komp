@@ -43,6 +43,9 @@ T1 2 3
 At T1, we press C E and G, at T2 we release C and press B, at T3 we release E and press D.
 */
 
+type Step = (Option<u8>, u8);
+type Part = Vec<Step>;
+
 fn split_parts(chord_change_dsl: &str) -> Vec<Vec<&str>> {
     let mut start = 0;
     let mut in_chunk = false;
@@ -86,7 +89,7 @@ fn steps(chord_change: &str) -> Vec<&str> {
     chord_change.split_whitespace().collect()
 }
 
-fn interpret(chord_steps: Vec<&str>) -> Vec<(Option<u8>, u8)> {
+fn interpret(chord_steps: Vec<&str>) -> Part {
     let mut res = vec![];
     for v in chord_steps {
         match v {
@@ -119,14 +122,14 @@ fn interpret(chord_steps: Vec<&str>) -> Vec<(Option<u8>, u8)> {
     res
 }
 
-fn interpret_dsl(chord_change_dsl: &str) -> Vec<Vec<(Option<u8>, u8)>> {
+fn interpret_dsl(chord_change_dsl: &str) -> Vec<Part> {
     let parts = split_parts(chord_change_dsl);
     let mut interpreted_parts = vec![];
     for steps in parts {
         interpreted_parts.push(interpret(steps));
     }
 
-    fn sum_len(s: &Vec<(Option<u8>, u8)>) -> u8 {
+    fn sum_len(s: &Part) -> u8 {
         s.iter().map(|i| i.1).sum()
     }
 
