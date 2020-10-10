@@ -147,6 +147,59 @@ fn interpret_dsl(chord_change_dsl: &str) -> Vec<Part> {
 
     interpreted_parts
 }
+use crate::pattern::{create_note, TimeCode};
+use crate::play::TimedEvent;
+
+fn step_to_timed_midi_events(
+    step: Step,
+    offset: TimeCode,
+    ticks_per_quarter: u32,
+) -> (Vec<TimedEvent>, TimeCode) {
+    let (maybe_note, number_of_bars) = step;
+    let end_time = offset + TimeCode::new(number_of_bars.into(), 0, 0);
+    if let Some(note) = maybe_note {
+        let last_bar_ticks = 3 * ticks_per_quarter;
+        let additional_bar_ticks = (number_of_bars as u32 - 1) * 4 * ticks_per_quarter;
+        let length = additional_bar_ticks + last_bar_ticks;
+        let (on, off) = create_note(offset.ticks(ticks_per_quarter), length, 0, note, 100);
+        (vec![on, off], end_time)
+    } else {
+        (vec![], end_time)
+    }
+}
+
+fn part_to_timed_midi_events(
+    part: &Part,
+    offset: TimeCode,
+    ticks_per_quarter: u32,
+) -> Vec<TimedEvent> {
+    let mut part_events = vec![];
+    let mut current_time = offset;
+    for step in part.iter() {
+        let (mut step_events, end_part) =
+            step_to_timed_midi_events(*step, current_time, ticks_per_quarter);
+        current_time = end_part;
+        part_events.append(&mut step_events);
+    }
+
+    part_events
+}
+
+use std::collections::BinaryHeap;
+
+fn parts_to_timed_midi_events(
+    parts: &Vec<Part>,
+    offset: TimeCode,
+    ticks_per_quarter: u32,
+) -> Vec<TimedEvent> {
+    let mut all_events = BinaryHeap::with_capacity(10);
+    for part in parts.iter() {
+        let part_events = part_to_timed_midi_events(part, offset, ticks_per_quarter);
+        all_events.extend(part_events);
+    }
+
+    all_events.into_sorted_vec()
+}
 
 #[cfg(test)]
 mod tests {
@@ -403,4 +456,76 @@ mod tests {
             vec![(Some(NOTE_G4), 1), (None, 2)]
         ]
     );
+
+    use crate::play::Event::*;
+    use crate::play::TimedEvent;
+
+    #[test]
+    fn test_silent_step_to_timed_midi_events() {
+        let ticks_per_quarter = 96;
+        let offset = TimeCode::new(1, 0, 0);
+        let expected_end_part = TimeCode::new(4, 0, 0);
+        let (data, end_part) = step_to_timed_midi_events((None, 3), offset, ticks_per_quarter);
+
+        assert_eq!(end_part, expected_end_part);
+        assert_eq!(data.len(), 0);
+    }
+
+    #[test]
+    fn test_note_step_to_timed_midi_events() {
+        let ticks_per_quarter = 96;
+        let offset = TimeCode::new(1, 0, 0);
+        let expected_end_note = TimeCode::new(3, 3, 0);
+        let expected_end_part = TimeCode::new(4, 0, 0);
+        let (data, end_part) =
+            step_to_timed_midi_events((Some(NOTE_C4), 3), offset, ticks_per_quarter);
+
+        assert_eq!(end_part, expected_end_part);
+        assert_eq!(
+            data,
+            vec![
+                TimedEvent {
+                    timing: offset.ticks(ticks_per_quarter),
+                    event: NoteOn {
+                        channel: 0,
+                        note: NOTE_C4,
+                        velocity: 100,
+                    }
+                },
+                TimedEvent {
+                    timing: expected_end_note.ticks(ticks_per_quarter),
+                    event: NoteOff {
+                        channel: 0,
+                        note: 60,
+                        velocity: 64
+                    }
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_part_to_timed_midi_events() {
+        let ticks_per_quarter = 96;
+        let offset = TimeCode::new(1, 0, 0);
+        let parts = vec![(Some(NOTE_E4), 1), (None, 1), (Some(NOTE_EFLAT4), 1)];
+        let events = part_to_timed_midi_events(&parts, offset, ticks_per_quarter);
+
+        assert_eq!(events.len(), 4);
+    }
+
+    #[test]
+    fn test_parts_to_timed_midi_events() {
+        let ticks_per_quarter = 96;
+        let offset = TimeCode::new(1, 0, 0);
+        let parts = vec![
+            vec![(Some(NOTE_C4), 2)],
+            vec![(Some(NOTE_E4), 1), (Some(NOTE_EFLAT4), 1)],
+            vec![(Some(NOTE_G4), 2)],
+        ];
+
+        let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter);
+
+        assert_eq!(events.len(), 8);
+    }
 }

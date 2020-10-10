@@ -1,6 +1,6 @@
 use crate::play::{Event, TimedEvent};
 
-fn create_note(
+pub fn create_note(
     timing: u32,
     length: u32,
     channel: u8,
