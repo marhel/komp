@@ -525,13 +525,19 @@ mod tests {
         let events = part_to_timed_midi_events(&parts, offset, ticks_per_quarter);
         let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
 
+        let first_bar = offset.ticks(ticks_per_quarter);
+        let second_bar = TimeCode::new(2, 0, 0).ticks(ticks_per_quarter);
+        let one_quarter = TimeCode::new(0, 1, 0).ticks(ticks_per_quarter);
+        let third_bar = TimeCode::new(3, 0, 0).ticks(ticks_per_quarter);
+        let fourth_bar = TimeCode::new(4, 0, 0).ticks(ticks_per_quarter);
+
         assert_eq!(
             note_data,
             [
-                NoteData::On(NOTE_E4, 384),
-                NoteData::Off(NOTE_E4, 672),
-                NoteData::On(NOTE_EFLAT4, 1152),
-                NoteData::Off(NOTE_EFLAT4, 1440),
+                NoteData::On(NOTE_E4, first_bar),
+                NoteData::Off(NOTE_E4, second_bar - one_quarter),
+                NoteData::On(NOTE_EFLAT4, third_bar),
+                NoteData::Off(NOTE_EFLAT4, fourth_bar - one_quarter),
             ]
         );
     }
@@ -549,17 +555,21 @@ mod tests {
         let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter);
 
         let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
+        let first_bar = offset.ticks(ticks_per_quarter);
+        let second_bar = TimeCode::new(2, 0, 0).ticks(ticks_per_quarter);
+        let one_quarter = TimeCode::new(0, 1, 0).ticks(ticks_per_quarter);
+        let third_bar = TimeCode::new(3, 0, 0).ticks(ticks_per_quarter);
         assert_eq!(
             note_data,
             [
-                NoteData::On(NOTE_C4, 384),
-                NoteData::On(NOTE_E4, 384),
-                NoteData::On(NOTE_G4, 384),
-                NoteData::Off(NOTE_E4, 672),
-                NoteData::On(NOTE_EFLAT4, 768),
-                NoteData::Off(NOTE_C4, 1056),
-                NoteData::Off(NOTE_EFLAT4, 1056),
-                NoteData::Off(NOTE_G4, 1056),
+                NoteData::On(NOTE_C4, first_bar),
+                NoteData::On(NOTE_E4, first_bar),
+                NoteData::On(NOTE_G4, first_bar),
+                NoteData::Off(NOTE_E4, second_bar - one_quarter),
+                NoteData::On(NOTE_EFLAT4, second_bar),
+                NoteData::Off(NOTE_C4, third_bar - one_quarter),
+                NoteData::Off(NOTE_EFLAT4, third_bar - one_quarter),
+                NoteData::Off(NOTE_G4, third_bar - one_quarter),
             ]
         );
     }
