@@ -54,6 +54,26 @@ impl std::ops::Add for TimeCode {
     }
 }
 
+impl std::ops::Sub for TimeCode {
+    type Output = Self;
+    fn sub(self, rhs: TimeCode) -> TimeCode {
+        let TimeCode {
+            mut bar,
+            mut beat,
+            tick,
+        } = self;
+        while beat < rhs.beat && bar > 0 {
+            bar -= 1;
+            beat += 4;
+        }
+        TimeCode {
+            bar: bar - rhs.bar,
+            beat: beat - rhs.beat,
+            tick: tick - rhs.tick,
+        }
+    }
+}
+
 impl std::cmp::PartialEq for TimeCode {
     fn eq(&self, rhs: &TimeCode) -> bool {
         self.ticks(1920) == rhs.ticks(1920)
@@ -163,6 +183,15 @@ mod tests {
         let two_two_two = TimeCode::new(2, 2, 2);
 
         assert_eq!(one_one_one + one_one_one, two_two_two);
+    }
+
+    #[test]
+    fn test_timecode_sub() {
+        let second_bar = TimeCode::new(2, 0, 0);
+        let one_quarter = TimeCode::new(0, 1, 0);
+        let one_three_quarters = TimeCode::new(1, 3, 0);
+
+        assert_eq!(second_bar - one_quarter, one_three_quarters);
     }
 
     #[test]
