@@ -504,14 +504,36 @@ mod tests {
         );
     }
 
+    #[derive(Debug, PartialEq)]
+    enum NoteData {
+        On(u8, u32),
+        Off(u8, u32),
+    }
+
+    fn to_note_data(te: &TimedEvent) -> NoteData {
+        match te.event {
+            NoteOn { note, .. } => NoteData::On(note, te.timing),
+            NoteOff { note, .. } => NoteData::Off(note, te.timing),
+        }
+    }
+
     #[test]
     fn test_part_to_timed_midi_events() {
         let ticks_per_quarter = 96;
         let offset = TimeCode::new(1, 0, 0);
         let parts = vec![(Some(NOTE_E4), 1), (None, 1), (Some(NOTE_EFLAT4), 1)];
         let events = part_to_timed_midi_events(&parts, offset, ticks_per_quarter);
+        let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
 
-        assert_eq!(events.len(), 4);
+        assert_eq!(
+            note_data,
+            [
+                NoteData::On(NOTE_E4, 384),
+                NoteData::Off(NOTE_E4, 672),
+                NoteData::On(NOTE_EFLAT4, 1152),
+                NoteData::Off(NOTE_EFLAT4, 1440),
+            ]
+        );
     }
 
     #[test]
@@ -526,6 +548,19 @@ mod tests {
 
         let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter);
 
-        assert_eq!(events.len(), 8);
+        let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
+        assert_eq!(
+            note_data,
+            [
+                NoteData::On(NOTE_C4, 384),
+                NoteData::On(NOTE_E4, 384),
+                NoteData::On(NOTE_G4, 384),
+                NoteData::Off(NOTE_E4, 672),
+                NoteData::On(NOTE_EFLAT4, 768),
+                NoteData::Off(NOTE_C4, 1056),
+                NoteData::Off(NOTE_EFLAT4, 1056),
+                NoteData::Off(NOTE_G4, 1056),
+            ]
+        );
     }
 }
