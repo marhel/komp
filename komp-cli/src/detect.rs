@@ -152,16 +152,14 @@ use crate::play::TimedEvent;
 
 fn step_to_timed_midi_events(
     step: Step,
-    offset: TimeCode,
-    ticks_per_quarter: u32,
-) -> (Vec<TimedEvent>, TimeCode) {
-    let (maybe_note, number_of_bars) = step;
-    let end_time = offset + TimeCode::new(number_of_bars.into(), 0, 0);
+    offset_ticks: u32,
+    ticks_per_unit: u32,
+) -> (Vec<TimedEvent>, u32) {
+    let (maybe_note, number_of_units) = step;
+    let end_time = offset_ticks + number_of_units as u32 * ticks_per_unit;
     if let Some(note) = maybe_note {
-        let last_bar_ticks = 3 * ticks_per_quarter;
-        let additional_bar_ticks = (number_of_bars as u32 - 1) * 4 * ticks_per_quarter;
-        let length = additional_bar_ticks + last_bar_ticks;
-        let (on, off) = create_note(offset.ticks(ticks_per_quarter), length, 0, note, 100);
+        let length = ticks_per_unit * (number_of_units as u32 * 4 - 1) / 4;
+        let (on, off) = create_note(offset_ticks, length, 0, note, 100);
         (vec![on, off], end_time)
     } else {
         (vec![], end_time)
@@ -170,14 +168,14 @@ fn step_to_timed_midi_events(
 
 fn part_to_timed_midi_events(
     part: &Part,
-    offset: TimeCode,
-    ticks_per_quarter: u32,
+    offset_ticks: u32,
+    ticks_per_unit: u32,
 ) -> Vec<TimedEvent> {
     let mut part_events = vec![];
-    let mut current_time = offset;
+    let mut current_time = offset_ticks;
     for step in part.iter() {
         let (mut step_events, end_part) =
-            step_to_timed_midi_events(*step, current_time, ticks_per_quarter);
+            step_to_timed_midi_events(*step, current_time, ticks_per_unit);
         current_time = end_part;
         part_events.append(&mut step_events);
     }
@@ -189,12 +187,12 @@ use std::collections::BinaryHeap;
 
 fn parts_to_timed_midi_events(
     parts: &Vec<Part>,
-    offset: TimeCode,
-    ticks_per_quarter: u32,
+    offset_ticks: u32,
+    ticks_per_unit: u32,
 ) -> Vec<TimedEvent> {
     let mut all_events = BinaryHeap::with_capacity(10);
     for part in parts.iter() {
-        let part_events = part_to_timed_midi_events(part, offset, ticks_per_quarter);
+        let part_events = part_to_timed_midi_events(part, offset_ticks, ticks_per_unit);
         all_events.extend(part_events);
     }
 
@@ -203,11 +201,11 @@ fn parts_to_timed_midi_events(
 
 pub fn interpret_dsl(
     chord_change_dsl: &str,
-    offset: TimeCode,
-    ticks_per_quarter: u32,
+    offset_ticks: u32,
+    ticks_per_unit: u32,
 ) -> Vec<TimedEvent> {
     let parts = parse_dsl(chord_change_dsl);
-    parts_to_timed_midi_events(&parts, offset, ticks_per_quarter)
+    parts_to_timed_midi_events(&parts, offset_ticks, ticks_per_unit)
 }
 
 #[cfg(test)]
@@ -472,9 +470,9 @@ mod tests {
     #[test]
     fn test_silent_step_to_timed_midi_events() {
         let ticks_per_quarter = 96;
-        let offset = TimeCode::new(1, 0, 0);
-        let expected_end_part = TimeCode::new(4, 0, 0);
-        let (data, end_part) = step_to_timed_midi_events((None, 3), offset, ticks_per_quarter);
+        let offset = TimeCode::new(1, 0, 0).ticks(ticks_per_quarter);
+        let expected_end_part = TimeCode::new(4, 0, 0).ticks(ticks_per_quarter);
+        let (data, end_part) = step_to_timed_midi_events((None, 3), offset, ticks_per_quarter * 4);
 
         assert_eq!(end_part, expected_end_part);
         assert_eq!(data.len(), 0);
@@ -483,18 +481,18 @@ mod tests {
     #[test]
     fn test_note_step_to_timed_midi_events() {
         let ticks_per_quarter = 96;
-        let offset = TimeCode::new(1, 0, 0);
-        let expected_end_note = TimeCode::new(3, 3, 0);
-        let expected_end_part = TimeCode::new(4, 0, 0);
+        let offset = TimeCode::new(1, 0, 0).ticks(ticks_per_quarter);
+        let expected_end_note = TimeCode::new(3, 3, 0).ticks(ticks_per_quarter);
+        let expected_end_part = TimeCode::new(4, 0, 0).ticks(ticks_per_quarter);
         let (data, end_part) =
-            step_to_timed_midi_events((Some(NOTE_C4), 3), offset, ticks_per_quarter);
+            step_to_timed_midi_events((Some(NOTE_C4), 3), offset, ticks_per_quarter * 4);
 
         assert_eq!(end_part, expected_end_part);
         assert_eq!(
             data,
             vec![
                 TimedEvent {
-                    timing: offset.ticks(ticks_per_quarter),
+                    timing: offset,
                     event: NoteOn {
                         channel: 0,
                         note: NOTE_C4,
@@ -502,7 +500,7 @@ mod tests {
                     }
                 },
                 TimedEvent {
-                    timing: expected_end_note.ticks(ticks_per_quarter),
+                    timing: expected_end_note,
                     event: NoteOff {
                         channel: 0,
                         note: 60,
@@ -529,12 +527,12 @@ mod tests {
     #[test]
     fn test_part_to_timed_midi_events() {
         let ticks_per_quarter = 96;
-        let offset = TimeCode::new(1, 0, 0);
+        let offset = TimeCode::new(1, 0, 0).ticks(ticks_per_quarter);
         let parts = vec![(Some(NOTE_E4), 1), (None, 1), (Some(NOTE_EFLAT4), 1)];
-        let events = part_to_timed_midi_events(&parts, offset, ticks_per_quarter);
+        let events = part_to_timed_midi_events(&parts, offset, ticks_per_quarter * 4);
         let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
 
-        let first_bar = offset.ticks(ticks_per_quarter);
+        let first_bar = offset;
         let second_bar = TimeCode::new(2, 0, 0).ticks(ticks_per_quarter);
         let one_quarter = TimeCode::new(0, 1, 0).ticks(ticks_per_quarter);
         let third_bar = TimeCode::new(3, 0, 0).ticks(ticks_per_quarter);
@@ -551,9 +549,9 @@ mod tests {
         );
     }
 
-    fn assert_c_to_c_minor(events: &Vec<TimedEvent>, offset: TimeCode, ticks_per_quarter: u32) {
+    fn assert_c_to_c_minor(events: &Vec<TimedEvent>, offset_ticks: u32, ticks_per_quarter: u32) {
         let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
-        let first_bar = offset.ticks(ticks_per_quarter);
+        let first_bar = offset_ticks;
         let second_bar = TimeCode::new(2, 0, 0).ticks(ticks_per_quarter);
         let one_quarter = TimeCode::new(0, 1, 0).ticks(ticks_per_quarter);
         let third_bar = TimeCode::new(3, 0, 0).ticks(ticks_per_quarter);
@@ -575,23 +573,23 @@ mod tests {
     #[test]
     fn test_parts_to_timed_midi_events() {
         let ticks_per_quarter = 96;
-        let offset = TimeCode::new(1, 0, 0);
+        let offset = TimeCode::new(1, 0, 0).ticks(ticks_per_quarter);
         let parts = vec![
             vec![(Some(NOTE_C4), 2)],
             vec![(Some(NOTE_E4), 1), (Some(NOTE_EFLAT4), 1)],
             vec![(Some(NOTE_G4), 2)],
         ];
 
-        let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter);
+        let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter * 4);
         assert_c_to_c_minor(&events, offset, ticks_per_quarter);
     }
 
     #[test]
     fn test_dsl_to_timed_midi_events() {
         let ticks_per_quarter = 96;
-        let offset = TimeCode::new(1, 0, 0);
+        let offset = TimeCode::new(1, 0, 0).ticks(ticks_per_quarter);
 
-        let events = interpret_dsl("C [E Eb] G", offset, ticks_per_quarter);
+        let events = interpret_dsl("C [E Eb] G", offset, ticks_per_quarter * 4);
         assert_c_to_c_minor(&events, offset, ticks_per_quarter);
     }
 }
