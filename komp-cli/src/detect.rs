@@ -89,7 +89,7 @@ fn steps(chord_change: &str) -> Vec<&str> {
     chord_change.split_whitespace().collect()
 }
 
-fn interpret(chord_steps: Vec<&str>) -> Part {
+fn parse_steps(chord_steps: Vec<&str>) -> Part {
     let mut res = vec![];
     for v in chord_steps {
         match v {
@@ -122,11 +122,11 @@ fn interpret(chord_steps: Vec<&str>) -> Part {
     res
 }
 
-fn interpret_dsl(chord_change_dsl: &str) -> Vec<Part> {
+fn parse_dsl(chord_change_dsl: &str) -> Vec<Part> {
     let parts = split_parts(chord_change_dsl);
     let mut interpreted_parts = vec![];
-    for steps in parts {
-        interpreted_parts.push(interpret(steps));
+    for part in parts {
+        interpreted_parts.push(parse_steps(part));
     }
 
     fn sum_len(s: &Part) -> u8 {
@@ -316,12 +316,12 @@ mod tests {
         }
     }
 
-    macro_rules! test_interpreter {
+    macro_rules! test_parse_steps {
         ($name:ident, $change:expr, $il:expr) => {
             #[test]
             fn $name() {
                 let steps = steps($change);
-                let res = interpret(steps);
+                let res = parse_steps(steps);
                 let il = $il;
                 assert!(
                     res.eq(&il),
@@ -334,77 +334,77 @@ mod tests {
         };
     }
 
-    test_interpreter!(simple_c, "C", vec![(Some(NOTE_C4), 1)]);
-    test_interpreter!(simple_csharp, "C#", vec![(Some(NOTE_CSHARP4), 1)]);
-    test_interpreter!(simple_dflat, "Db", vec![(Some(NOTE_DFLAT4), 1)]);
-    test_interpreter!(simple_d, "D", vec![(Some(NOTE_D4), 1)]);
-    test_interpreter!(simple_dsharp, "D#", vec![(Some(NOTE_DSHARP4), 1)]);
-    test_interpreter!(simple_eflat, "Eb", vec![(Some(NOTE_EFLAT4), 1)]);
-    test_interpreter!(simple_e, "E", vec![(Some(NOTE_E4), 1)]);
-    test_interpreter!(simple_f, "F", vec![(Some(NOTE_F4), 1)]);
-    test_interpreter!(simple_fsharp, "F#", vec![(Some(NOTE_FSHARP4), 1)]);
-    test_interpreter!(simple_gflat, "Gb", vec![(Some(NOTE_GFLAT4), 1)]);
-    test_interpreter!(simple_g, "G", vec![(Some(NOTE_G4), 1)]);
-    test_interpreter!(simple_gsharp, "G#", vec![(Some(NOTE_GSHARP4), 1)]);
-    test_interpreter!(simple_aflat, "Ab", vec![(Some(NOTE_AFLAT4), 1)]);
-    test_interpreter!(simple_a, "A", vec![(Some(NOTE_A4), 1)]);
-    test_interpreter!(simple_asharp, "A#", vec![(Some(NOTE_ASHARP4), 1)]);
-    test_interpreter!(simple_bflat, "Bb", vec![(Some(NOTE_BFLAT4), 1)]);
-    test_interpreter!(simple_b, "B", vec![(Some(NOTE_B4), 1)]);
-    test_interpreter!(c_len2, "C _", vec![(Some(NOTE_C4), 2)]);
-    test_interpreter!(c_len3, "C _ _", vec![(Some(NOTE_C4), 3)]);
-    test_interpreter!(
+    test_parse_steps!(simple_c, "C", vec![(Some(NOTE_C4), 1)]);
+    test_parse_steps!(simple_csharp, "C#", vec![(Some(NOTE_CSHARP4), 1)]);
+    test_parse_steps!(simple_dflat, "Db", vec![(Some(NOTE_DFLAT4), 1)]);
+    test_parse_steps!(simple_d, "D", vec![(Some(NOTE_D4), 1)]);
+    test_parse_steps!(simple_dsharp, "D#", vec![(Some(NOTE_DSHARP4), 1)]);
+    test_parse_steps!(simple_eflat, "Eb", vec![(Some(NOTE_EFLAT4), 1)]);
+    test_parse_steps!(simple_e, "E", vec![(Some(NOTE_E4), 1)]);
+    test_parse_steps!(simple_f, "F", vec![(Some(NOTE_F4), 1)]);
+    test_parse_steps!(simple_fsharp, "F#", vec![(Some(NOTE_FSHARP4), 1)]);
+    test_parse_steps!(simple_gflat, "Gb", vec![(Some(NOTE_GFLAT4), 1)]);
+    test_parse_steps!(simple_g, "G", vec![(Some(NOTE_G4), 1)]);
+    test_parse_steps!(simple_gsharp, "G#", vec![(Some(NOTE_GSHARP4), 1)]);
+    test_parse_steps!(simple_aflat, "Ab", vec![(Some(NOTE_AFLAT4), 1)]);
+    test_parse_steps!(simple_a, "A", vec![(Some(NOTE_A4), 1)]);
+    test_parse_steps!(simple_asharp, "A#", vec![(Some(NOTE_ASHARP4), 1)]);
+    test_parse_steps!(simple_bflat, "Bb", vec![(Some(NOTE_BFLAT4), 1)]);
+    test_parse_steps!(simple_b, "B", vec![(Some(NOTE_B4), 1)]);
+    test_parse_steps!(c_len2, "C _", vec![(Some(NOTE_C4), 2)]);
+    test_parse_steps!(c_len3, "C _ _", vec![(Some(NOTE_C4), 3)]);
+    test_parse_steps!(
         double_c,
         "C C",
         vec![(Some(NOTE_C4), 1), (Some(NOTE_C4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_len2_c,
         "C _ C",
         vec![(Some(NOTE_C4), 2), (Some(NOTE_C4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_len3_c,
         "C _ _ C",
         vec![(Some(NOTE_C4), 3), (Some(NOTE_C4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_len2_c_len2,
         "C _ C _",
         vec![(Some(NOTE_C4), 2), (Some(NOTE_C4), 2)]
     );
-    test_interpreter!(c_silence, "C -", vec![(Some(NOTE_C4), 1), (None, 1)]);
-    test_interpreter!(
+    test_parse_steps!(c_silence, "C -", vec![(Some(NOTE_C4), 1), (None, 1)]);
+    test_parse_steps!(
         c_silence_c,
         "C - C",
         vec![(Some(NOTE_C4), 1), (None, 1), (Some(NOTE_C4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_silence_silence_c,
         "C - - C",
         vec![(Some(NOTE_C4), 1), (None, 1), (None, 1), (Some(NOTE_C4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_silence_len2_c,
         "C - _ C",
         vec![(Some(NOTE_C4), 1), (None, 2), (Some(NOTE_C4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_silence_d,
         "C - D",
         vec![(Some(NOTE_C4), 1), (None, 1), (Some(NOTE_D4), 1)]
     );
-    test_interpreter!(
+    test_parse_steps!(
         c_d_e,
         "C D E",
         vec![(Some(NOTE_C4), 1), (Some(NOTE_D4), 1), (Some(NOTE_E4), 1)]
     );
 
-    macro_rules! test_interpret_dsl {
+    macro_rules! test_parse_dsl {
         ($name:ident, $change_dsl:expr, $il:expr) => {
             #[test]
             fn $name() {
-                let interpreted_parts = interpret_dsl($change_dsl);
+                let interpreted_parts = parse_dsl($change_dsl);
                 let il = $il;
                 assert!(
                     interpreted_parts.eq(&il),
@@ -417,7 +417,7 @@ mod tests {
         };
     }
 
-    test_interpret_dsl!(
+    test_parse_dsl!(
         c_to_cm_len2,
         "C [E Eb] G",
         vec![
@@ -427,7 +427,7 @@ mod tests {
         ]
     );
 
-    test_interpret_dsl!(
+    test_parse_dsl!(
         c_to_cm_len3,
         "C [E - Eb] [G -]",
         vec![
@@ -437,7 +437,7 @@ mod tests {
         ]
     );
 
-    test_interpret_dsl!(
+    test_parse_dsl!(
         c_to_cm_len3_variant2,
         "C [E _ Eb] [G _]",
         vec![
@@ -447,7 +447,7 @@ mod tests {
         ]
     );
 
-    test_interpret_dsl!(
+    test_parse_dsl!(
         c_to_cm_len3_variant3,
         "C [E Eb _] [G -]",
         vec![
