@@ -201,6 +201,15 @@ fn parts_to_timed_midi_events(
     all_events.into_sorted_vec()
 }
 
+pub fn interpret_dsl(
+    chord_change_dsl: &str,
+    offset: TimeCode,
+    ticks_per_quarter: u32,
+) -> Vec<TimedEvent> {
+    let parts = parse_dsl(chord_change_dsl);
+    parts_to_timed_midi_events(&parts, offset, ticks_per_quarter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,18 +551,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_parts_to_timed_midi_events() {
-        let ticks_per_quarter = 96;
-        let offset = TimeCode::new(1, 0, 0);
-        let parts = vec![
-            vec![(Some(NOTE_C4), 2)],
-            vec![(Some(NOTE_E4), 1), (Some(NOTE_EFLAT4), 1)],
-            vec![(Some(NOTE_G4), 2)],
-        ];
-
-        let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter);
-
+    fn assert_c_to_c_minor(events: &Vec<TimedEvent>, offset: TimeCode, ticks_per_quarter: u32) {
         let note_data: Vec<NoteData> = events.iter().map(to_note_data).collect();
         let first_bar = offset.ticks(ticks_per_quarter);
         let second_bar = TimeCode::new(2, 0, 0).ticks(ticks_per_quarter);
@@ -572,5 +570,28 @@ mod tests {
                 NoteData::Off(NOTE_G4, third_bar - one_quarter),
             ]
         );
+    }
+
+    #[test]
+    fn test_parts_to_timed_midi_events() {
+        let ticks_per_quarter = 96;
+        let offset = TimeCode::new(1, 0, 0);
+        let parts = vec![
+            vec![(Some(NOTE_C4), 2)],
+            vec![(Some(NOTE_E4), 1), (Some(NOTE_EFLAT4), 1)],
+            vec![(Some(NOTE_G4), 2)],
+        ];
+
+        let events = parts_to_timed_midi_events(&parts, offset, ticks_per_quarter);
+        assert_c_to_c_minor(&events, offset, ticks_per_quarter);
+    }
+
+    #[test]
+    fn test_dsl_to_timed_midi_events() {
+        let ticks_per_quarter = 96;
+        let offset = TimeCode::new(1, 0, 0);
+
+        let events = interpret_dsl("C [E Eb] G", offset, ticks_per_quarter);
+        assert_c_to_c_minor(&events, offset, ticks_per_quarter);
     }
 }
