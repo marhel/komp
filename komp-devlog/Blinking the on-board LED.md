@@ -1,0 +1,2 @@
+Blinking a LED is the "Hello World" of embedded development. 
+If you have a probe, I recommend trying [[Blinking the LED with Embassy]]. If you don't have a probe, look at [[Blinking the LED with RP-HAL-boards]]
