@@ -4,7 +4,9 @@ We're going to use [the Embassy embedded development framework](https://embassy.
     $ git clone https://github.com/embassy-rs/embassy.git
     $ cd embassy
     $ git submodule update --init
-    
+
+> Note that as of this writing, Embassy's "Getting started" documentation still recommends installing [probe-run, which is now deprecated in favor of probe-rs](https://ferrous-systems.com/blog/probe-run-deprecation/) so maybe don't bother installing it.
+
 If you do have a probe setup, Embassy is already configured to use probe-rs to flash example code to your Pico, so you can just do a cargo run command to run their [blinky example](https://github.com/embassy-rs/embassy/blob/main/examples/rp/src/bin/blinky.rs) for the Pico with;
 
 > Maybe it is not obvious, but you can configure your own project to depend on Embassy, but still use whatever runner you like, so Embassy also works fine without a probe.

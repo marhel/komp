@@ -23,7 +23,9 @@ async fn main(_spawner: Spawner) {
     info!("Player listening...");
     loop {
         let mut buf = [0; 16];
-        rx.read(&mut buf).await.unwrap();
-        info!("RX {:?}", buf);
+        match rx.read(&mut buf).await {
+            Ok(_) => info!("RX {:?}", buf),
+            Err(err) => error!("ERR: {:?}", err),
+        };
     }
 }

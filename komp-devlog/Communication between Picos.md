@@ -72,9 +72,19 @@ The relevant part is in the beginning;
 	called `Result::unwrap()` on an `Err` value: Break
 	└─ /home/martin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/panic-probe-0.3.1/src/lib.rs:104
 
-This is actually good, because we can see that when running via the probe, we are notified when the program fails on-device, pointing to the location that panicked, in this case src/bin/player.rs line 41 seems to have called `.unwrap()` on an Err::Break value.
+This is actually good, because we can see that when running via the probe, we are notified when the program fails on-device, pointing to the location that panicked, in this case `src/bin/player.rs` line 41 seems to have called `.unwrap()` on an Err::Break value.
 
-Handing the error makes the player more robust.
+Handing the error makes the player more robust;
+
+```rust
+     loop {
+         let mut buf = [0; 16];
+         match rx.read(&mut buf).await {
+            Ok(_) => info!("RX {:?}", buf),
+            Err(err) => error!("ERR: {:?}", err),
+         };
+     }
+```
 ## Now were talking
 
 	driver$ cargo run
